@@ -174,6 +174,8 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     );
     await page.getByRole('switch', { name: 'Nachtmodus' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await page.getByLabel('Abrechnungsjahr auswählen').selectOption('2024');
+    await expect(page.getByRole('heading', { level: 1, name: 'Cockpit 2024' })).toBeVisible();
 
     await expect(metric(page, 'Umlagefähig extern')).toContainText(/1\.169,69\s*€/);
     await expect(metric(page, 'Kosten intern')).toContainText(/1\.169,69\s*€/);
