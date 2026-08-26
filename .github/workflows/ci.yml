@@ -27,6 +27,23 @@ jobs:
       - name: Code und Berechnungen prüfen
         run: npm run check
 
+      - name: Chromium für Oberflächentest installieren
+        run: npx playwright install --with-deps chromium
+
+      - name: Buttons und sichtbare Zahlen im Browser prüfen
+        run: npm run test:e2e
+
+      - name: Browser-Testbericht speichern
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Bekannte Sicherheitslücken prüfen
         run: npm audit --audit-level=high
 

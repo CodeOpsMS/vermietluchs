@@ -65,9 +65,15 @@ Vor einem Commit:
 
 ```bash
 npm run check
+npm run test:e2e
 ```
 
-Der Befehl prüft TypeScript, Stilregeln, Fachtests und den Produktions-Build.
+`npm run check` prüft TypeScript, Stilregeln, Fachtests und den Produktions-Build.
+`npm run test:e2e` startet zusätzlich eine isolierte temporäre Datenbank und
+klickt die wichtigsten Buttons und Zahlen in einem echten Chromium-Browser
+durch. Beim ersten lokalen Lauf wird Chromium mit
+`npx playwright install chromium` installiert. Die GitHub-Pipeline führt beide
+Prüfungen automatisch aus.
 
 ## Ein sinnvoller erster Durchlauf
 
