@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DATA_CONFLICT_EVENT, getJson } from './api';
 import { ErrorBox, Loading } from './components/Common';
+import ThemeToggle from './components/ThemeToggle';
+import { applyTheme, readInitialTheme, type ThemeMode } from './theme';
 import type { AppData, Cost, Meter, Payment, Property, Reading, Tenancy, Unit } from './types';
 import CockpitPage from './pages/CockpitPage';
 import PropertiesPage from './pages/PropertiesPage';
@@ -12,14 +14,30 @@ import SettingsPage from './pages/SettingsPage';
 
 type PageId = 'cockpit' | 'properties' | 'costs' | 'meters' | 'rent' | 'settlement' | 'settings';
 
-const NAVIGATION: { id: PageId; label: string; short: string }[] = [
-  { id: 'cockpit', label: 'Cockpit', short: 'Übersicht' },
-  { id: 'properties', label: 'Häuser & Wohnungen', short: 'Häuser' },
-  { id: 'costs', label: 'Kosten', short: 'Kosten' },
-  { id: 'meters', label: 'Zähler & Ablesungen', short: 'Zähler' },
-  { id: 'rent', label: 'Mietkonto', short: 'Mietkonto' },
-  { id: 'settlement', label: 'Abrechnung', short: 'Abrechnung' },
-  { id: 'settings', label: 'Einstellungen', short: 'Einstellungen' },
+const NAVIGATION_GROUPS: { label: string; items: { id: PageId; label: string }[] }[] = [
+  {
+    label: 'Übersicht',
+    items: [{ id: 'cockpit', label: 'Cockpit' }],
+  },
+  {
+    label: 'Verwalten · laufend',
+    items: [
+      { id: 'meters', label: 'Zähler & Ablesungen' },
+      { id: 'costs', label: 'Kosten' },
+      { id: 'rent', label: 'Mietkonto' },
+    ],
+  },
+  {
+    label: 'Abrechnen · Jahresende',
+    items: [{ id: 'settlement', label: 'Abrechnung' }],
+  },
+  {
+    label: 'Einrichten · selten',
+    items: [
+      { id: 'properties', label: 'Stammdaten' },
+      { id: 'settings', label: 'Einstellungen' },
+    ],
+  },
 ];
 
 const EMPTY_DATA: AppData = {
@@ -42,6 +60,7 @@ export default function App() {
   const [scopeRevision, setScopeRevision] = useState(0);
   const loadedOnce = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme);
   const [year, setYear] = useState(new Date().getFullYear());
   const [propertyId, setPropertyId] = useState<number | null>(() => {
     const value = localStorage.getItem('vermietluchs-property');
@@ -95,6 +114,10 @@ export default function App() {
     if (propertyId) localStorage.setItem('vermietluchs-property', String(propertyId));
     else localStorage.removeItem('vermietluchs-property');
   }, [propertyId]);
+  useEffect(() => {
+    applyTheme(theme);
+    localStorage.setItem('vermietluchs-theme', theme);
+  }, [theme]);
 
   const selectedProperty = data.properties.find((property) => property.id === propertyId) ?? null;
   const yearOptions = useMemo(() => {
@@ -163,7 +186,7 @@ export default function App() {
         aria-label="Menü schließen"
         onClick={() => setMenuOpen(false)}
       />
-      <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
+      <aside id="main-navigation" className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <button className="brand" type="button" onClick={() => navigate('cockpit')}>
           <img src="/vermietluchs.svg" alt="" />
           <span>
@@ -172,21 +195,33 @@ export default function App() {
           </span>
         </button>
         <nav aria-label="Hauptnavigation">
-          {NAVIGATION.map((item, index) => (
-            <button
-              key={item.id}
-              className={page === item.id ? 'active' : ''}
-              type="button"
-              onClick={() => navigate(item.id)}
-            >
-              <span className="nav-number">{String(index + 1).padStart(2, '0')}</span>
-              <span>{item.label}</span>
-            </button>
+          {NAVIGATION_GROUPS.map((group) => (
+            <div className="navigation-group" key={group.label}>
+              <p className="nav-category">{group.label}</p>
+              {group.items.map((item) => (
+                <button
+                  key={item.id}
+                  className={page === item.id ? 'active' : ''}
+                  type="button"
+                  aria-current={page === item.id ? 'page' : undefined}
+                  onClick={() => navigate(item.id)}
+                >
+                  <span className="nav-dot" aria-hidden="true" />
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
-        <div className="sidebar-foot">
-          <span className="local-dot" />
-          Lokal gespeichert
+        <div className="sidebar-bottom">
+          <ThemeToggle
+            theme={theme}
+            onToggle={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
+          />
+          <div className="sidebar-foot">
+            <span className="local-dot" aria-hidden="true" />
+            Alle Daten bleiben lokal
+          </div>
         </div>
       </aside>
 
@@ -196,6 +231,8 @@ export default function App() {
             className="menu-button"
             type="button"
             aria-label="Navigation öffnen"
+            aria-controls="main-navigation"
+            aria-expanded={menuOpen}
             onClick={() => setMenuOpen(true)}
           >
             ☰
@@ -204,10 +241,11 @@ export default function App() {
             <img src="/vermietluchs.svg" alt="" />
             <strong>Vermietluchs</strong>
           </div>
-          <div className="topbar-controls">
+          <div className="topbar-controls" role="group" aria-label="Aktuelle Auswahl">
             <label>
               <span>Haus</span>
               <select
+                aria-label="Haus auswählen"
                 value={propertyId ?? ''}
                 onChange={(event) =>
                   setPropertyId(event.target.value ? Number(event.target.value) : null)
@@ -223,7 +261,11 @@ export default function App() {
             </label>
             <label>
               <span>Jahr</span>
-              <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
+              <select
+                aria-label="Abrechnungsjahr auswählen"
+                value={year}
+                onChange={(event) => setYear(Number(event.target.value))}
+              >
                 {yearOptions.map((value) => (
                   <option key={value} value={value}>
                     {value}

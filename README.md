@@ -12,6 +12,7 @@ Jahren Programmiererfahrung gut nachvollziehbar bleibt.
 ## Was die App kann
 
 - mehrere Häuser und Wohnungen verwalten
+- zwischen hellem Tagdesign und dunklem Nachtdesign wechseln
 - mehrere aufeinanderfolgende Mietverhältnisse je Wohnung abbilden
 - Mieterwechsel mit optionalen Zwischenablesungen erfassen
 - interne Kosten und umlagefähige Mieterkosten getrennt pflegen
