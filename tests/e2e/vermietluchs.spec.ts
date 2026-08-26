@@ -192,32 +192,32 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
 
     await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Manfred Lämmerzahl');
-    await page.getByRole('button', { name: 'Einstellungen speichern' }).click();
+    await page.getByRole('button', { name: 'Einstellungen speichern', exact: true }).click();
     await expect(page.getByText('Einstellungen gespeichert.')).toBeVisible();
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'JSON-Backup herunterladen' }).click();
+    await page.getByRole('button', { name: 'JSON-Backup herunterladen', exact: true }).click();
     await expect((await downloadPromise).suggestedFilename()).toMatch(
       /^vermietluchs-backup-\d{4}-\d{2}-\d{2}\.json$/,
     );
     const chooserPromise = page.waitForEvent('filechooser');
-    await page.getByRole('button', { name: 'Backup einspielen' }).click();
+    await page.getByRole('button', { name: 'Backup einspielen', exact: true }).click();
     const chooser = await chooserPromise;
     await chooser.setFiles([]);
 
     await navigate(page, 'Stammdaten', 'Häuser & Wohnungen');
-    await page.getByRole('button', { name: '+ Haus anlegen' }).click();
+    await page.getByRole('button', { name: '+ Haus anlegen', exact: true }).click();
     let dialog = page.getByRole('dialog', { name: 'Haus anlegen' });
     await expect(dialog.getByLabel('Bezeichnung')).toBeFocused();
     await dialog.getByLabel('Bezeichnung').fill('E2E Testhaus');
     await dialog.getByLabel('Anschrift', { exact: true }).fill('Testweg 1, 12345 Teststadt');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(
       page.locator('.property-strip').getByText('E2E Testhaus', { exact: true }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Haus E2E Testhaus bearbeiten' }).click();
+    await page.getByRole('button', { name: 'Haus E2E Testhaus bearbeiten', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Haus bearbeiten' });
     await dialog.getByLabel('Bezeichnung').fill('E2E Testhaus geändert');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     const propertySelect = page.getByLabel('Haus auswählen');
     await propertySelect.selectOption({ label: 'E2E Testhaus geändert' });
     await expect(propertySelect.locator('option:checked')).toHaveText('E2E Testhaus geändert');
@@ -236,16 +236,18 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await dialog.getByLabel('Etage').fill('EG');
     await dialog.getByLabel('Fläche in m²').fill('33,3');
     await dialog.getByLabel('Einheitengewicht').fill('1');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     let testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
     await expect(testUnit).toBeVisible();
-    await page.getByRole('button', { name: 'Wohnung E2E Testwohnung bearbeiten' }).click();
+    await page
+      .getByRole('button', { name: 'Wohnung E2E Testwohnung bearbeiten', exact: true })
+      .click();
     dialog = page.getByRole('dialog', { name: 'Wohnung bearbeiten' });
     await dialog.getByLabel('Etage').fill('Erdgeschoss');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
     await expect(testUnit).toContainText('Erdgeschoss');
-    await testUnit.getByRole('button', { name: '+ Mietverhältnis' }).click();
+    await testUnit.getByRole('button', { name: '+ Mietverhältnis', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Mietverhältnis anlegen' });
     await dialog.getByLabel('Name', { exact: true }).fill('E2E Testmieter');
     await dialog.getByLabel('Personen').fill('1');
@@ -255,16 +257,16 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await dialog.getByLabel('NK-Vorauszahlung / Monat').fill('100');
     await dialog.getByLabel('Garage / Monat').fill('0');
     await dialog.getByLabel('Zahlungstag').fill('3');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
     await testUnit.locator('summary').filter({ hasText: 'Mietverlauf (1)' }).click();
-    await testUnit.getByRole('button', { name: 'Bearbeiten' }).click();
+    await testUnit.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Mietverhältnis bearbeiten' });
     await dialog.getByLabel('Name', { exact: true }).fill('E2E Testmieter geändert');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
     await testUnit.locator('summary').filter({ hasText: 'Mietverlauf (1)' }).click();
-    await testUnit.getByRole('button', { name: 'Mieterwechsel' }).click();
+    await testUnit.getByRole('button', { name: 'Mieterwechsel', exact: true }).click();
     await expect(
       page.getByRole('dialog', { name: 'Mieterwechsel · E2E Testwohnung' }),
     ).toBeVisible();
@@ -292,13 +294,15 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     dialog = page.getByRole('dialog', { name: 'Zähler anlegen' });
     await dialog.getByLabel('Bezeichnung').fill('E2E Prüfzähler');
     await dialog.getByLabel('Zählernummer').fill('E2E-1');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     let testMeter = page.locator('.meter-card').filter({ hasText: 'E2E Prüfzähler' });
     await expect(testMeter).toBeVisible();
-    await page.getByRole('button', { name: 'Zähler E2E Prüfzähler bearbeiten' }).click();
+    await page
+      .getByRole('button', { name: 'Zähler E2E Prüfzähler bearbeiten', exact: true })
+      .click();
     dialog = page.getByRole('dialog', { name: 'Zähler bearbeiten' });
     await dialog.getByLabel('Bezeichnung').fill('E2E Prüfzähler geändert');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     testMeter = page.locator('.meter-card').filter({ hasText: 'E2E Prüfzähler geändert' });
     await acceptDialogAfter(page, () =>
       testMeter
@@ -309,33 +313,38 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     );
     await expect(testMeter).toHaveCount(0);
     const waterMeter = page.locator('.meter-card').filter({ hasText: 'Kaltwasser Bad' });
-    await waterMeter.getByRole('button', { name: '+ Ablesung' }).click();
+    await waterMeter.getByRole('button', { name: '+ Ablesung', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Ablesung erfassen' });
     await dialog.getByLabel('Datum').fill('2024-06-30');
     await dialog.getByLabel('Zählerstand').fill('130');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
-    await page.getByRole('button', { name: 'Ablesung vom 30.06.2024 bearbeiten' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Ablesung vom 30.06.2024 bearbeiten', exact: true })
+      .click();
     dialog = page.getByRole('dialog', { name: 'Ablesung bearbeiten' });
     await dialog.getByLabel('Zählerstand').fill('131');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(waterMeter).toContainText('131 m³');
     await acceptDialogAfter(page, () =>
       waterMeter.getByRole('button', { name: /Ablesung vom 30\.06\.2024 löschen/ }).click(),
     );
 
     await navigate(page, 'Kosten', 'Kosten 2024');
-    await page.getByRole('button', { name: '+ Kostenposition' }).click();
+    await page.getByRole('button', { name: '+ Kostenposition', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Kostenposition erfassen' });
     await dialog.getByLabel('Interne Bezeichnung').fill('E2E temporäre Kosten');
     await dialog.getByLabel('Originalbetrag').fill('10');
     await dialog.getByLabel('Mieterstatus').selectOption('excluded');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await page
-      .getByRole('button', { name: 'Kostenposition E2E temporäre Kosten bearbeiten' })
+      .getByRole('button', {
+        name: 'Kostenposition E2E temporäre Kosten bearbeiten',
+        exact: true,
+      })
       .click();
     dialog = page.getByRole('dialog', { name: 'Kostenposition bearbeiten' });
     await dialog.getByLabel('Interne Bezeichnung').fill('E2E temporäre Kosten geändert');
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await acceptDialogAfter(page, () =>
       page
         .getByRole('button', { name: /Kostenposition „E2E temporäre Kosten geändert“ löschen/ })
@@ -362,18 +371,20 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
       page.getByRole('button', { name: 'Jahressoll erzeugen', exact: true }).click(),
     );
     await expect(page.getByText('Alle Monatsbuchungen waren bereits vorhanden.')).toBeVisible();
-    await page.getByRole('button', { name: '+ Buchung' }).click();
+    await page.getByRole('button', { name: '+ Buchung', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Zahlung erfassen' });
     await expect(dialog.getByLabel('Kaltmiete Soll')).toHaveValue('700');
-    await dialog.getByRole('button', { name: 'Abbrechen' }).click();
-    await page.getByRole('button', { name: 'Buchung vom 03.01.2024 bearbeiten' }).click();
+    await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Buchung vom 03.01.2024 bearbeiten', exact: true })
+      .click();
     dialog = page.getByRole('dialog', { name: 'Buchung bearbeiten' });
     await expect(dialog.getByLabel('Zahlung gesamt')).toHaveValue(/850,00\s*€/);
-    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page.locator('.ledger-table tbody tr')).toHaveCount(7);
 
     await navigate(page, 'Abrechnung', 'Abrechnung 2024');
-    await page.getByRole('button', { name: 'Vorschau berechnen' }).click();
+    await page.getByRole('button', { name: 'Vorschau berechnen', exact: true }).click();
     const paper = page.locator('.settlement-paper');
     await expect(paper).toBeVisible();
     await expect(paper).toContainText('Manfred Lämmerzahl');
@@ -386,22 +397,22 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(paper.locator('.settlement-total')).toContainText(/119,69\s*€/);
     await expect(paper.getByText(/Rundungsdifferenz/i)).toHaveCount(0);
     await expect(paper.locator('img')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Drucken / PDF' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Drucken / PDF', exact: true })).toHaveCount(0);
     await acceptDialogAfter(page, () =>
-      page.getByRole('button', { name: 'Abrechnung abschließen' }).click(),
+      page.getByRole('button', { name: 'Abrechnung abschließen', exact: true }).click(),
     );
     await expect(page.getByText('Diese Abrechnung ist abgeschlossen.')).toBeVisible();
-    await page.getByRole('button', { name: 'Drucken / PDF' }).click();
+    await page.getByRole('button', { name: 'Drucken / PDF', exact: true }).click();
     await expect
       .poll(() => page.evaluate(() => Reflect.get(globalThis, '__vermietluchsPrintCalled')))
       .toBe(true);
     await acceptDialogAfter(page, () =>
-      page.getByRole('button', { name: 'Zur Korrektur öffnen' }).click(),
+      page.getByRole('button', { name: 'Zur Korrektur öffnen', exact: true }).click(),
     );
     await expect(page.getByText(/Korrekturvorschau:/)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Drucken / PDF' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Drucken / PDF', exact: true })).toHaveCount(0);
     await acceptDialogAfter(page, () =>
-      page.getByRole('button', { name: 'Abrechnung abschließen' }).click(),
+      page.getByRole('button', { name: 'Abrechnung abschließen', exact: true }).click(),
     );
     await expect(page.getByText('Diese Abrechnung ist abgeschlossen.')).toBeVisible();
     await navigate(page, 'Cockpit', 'Cockpit 2024');
@@ -410,7 +421,7 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
       hasText: '2024 · Demo Mieter Januar–Juli',
     });
     await archiveItem.getByRole('button', { name: 'Öffnen', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Geöffnet' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Geöffnet', exact: true })).toBeVisible();
     await expect(page.locator('.settlement-paper')).toContainText(/119,69\s*€/);
     await expect(pageErrors).toEqual([]);
   });
@@ -419,7 +430,7 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
     await page.getByLabel('Abrechnungsjahr auswählen').selectOption('2024');
-    const menuButton = page.getByRole('button', { name: 'Navigation öffnen' });
+    const menuButton = page.getByRole('button', { name: 'Navigation öffnen', exact: true });
     await menuButton.click();
     await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
     await page
@@ -429,7 +440,7 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Kosten 2024' })).toBeVisible();
     await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
     await menuButton.click();
-    await page.getByRole('button', { name: 'Menü schließen' }).click();
+    await page.getByRole('button', { name: 'Menü schließen', exact: true }).click();
     await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
     expect(
       await page.evaluate(
