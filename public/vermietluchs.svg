@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title description">
+  <title id="title">Vermietluchs</title>
+  <desc id="description">Stilisierter Luchskopf mit Ohrpinseln unter einem Hausdach</desc>
+  <path d="M10 42 48 12l38 30" fill="none" stroke="#17253b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22 38v40c0 5 4 8 9 8h34c5 0 9-3 9-8V38L48 19 22 38Z" fill="#f3dfb5" stroke="#17253b" stroke-width="4" stroke-linejoin="round"/>
+  <path d="m27 38-3-19 14 11M69 38l3-19-14 11" fill="#b86f2d" stroke="#17253b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m24 20-4-10m9 12 1-12M72 20l4-10m-9 12-1-12" fill="none" stroke="#17253b" stroke-width="4" stroke-linecap="round"/>
+  <path d="M31 41c6-8 28-8 34 0l-3 28-14 12-14-12-3-28Z" fill="#c9823e" stroke="#17253b" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M35 49c4-3 8-3 12 0-4 4-8 4-12 0Zm14 0c4-3 8-3 12 0-4 4-8 4-12 0Z" fill="#17253b"/>
+  <path d="m48 55-5 7 5 3 5-3-5-7Z" fill="#6f3e26" stroke="#17253b" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M48 65v8m0 0-7-4m7 4 7-4M36 59l-12-3m12 8-13 2m37-7 12-3m-12 8 13 2" fill="none" stroke="#17253b" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="31" cy="54" r="2" fill="#6f3e26"/><circle cx="65" cy="54" r="2" fill="#6f3e26"/>
+</svg>
