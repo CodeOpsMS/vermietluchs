@@ -1,17 +1,22 @@
+import { createHash } from 'node:crypto';
 import type { Router } from 'express';
 import { z } from 'zod';
 import type { CostCalculationResult, SettlementResult, TenancyStatement } from '../domain';
-import { dateSchema, settlementCreateSchema } from '../shared/schemas';
+import { dateSchema, settlementCloseSchema, settlementCreateSchema } from '../shared/schemas';
 import type { SqliteDatabase } from './database';
 import { ApiError } from './errors';
-import { optionalId, optionalYear, parseId } from './http';
+import { optionalId, optionalYear, parseId, revisionFromIfMatch } from './http';
 
 export type SettlementRequest = {
   propertyId: number;
   tenancyId: number;
   year: number;
-  roundingDifference: number;
-  roundingGroup: string;
+};
+
+type SettlementCloseRequest = SettlementRequest & {
+  expectedCalculationToken: string;
+  correctionSnapshotId?: number;
+  correctionRevision?: number;
 };
 
 export type SettlementCalculator = (
@@ -30,6 +35,7 @@ const settlementRowPayloadSchema = z
     tenantShare: z.number().finite(),
     labor35a: z.number().finite().nonnegative(),
     allocationRounding: z.number().finite(),
+    // Nur alte Snapshots können noch eine manuelle Excel-Centzeile enthalten.
     isRoundingDifference: z.boolean(),
   })
   .strict();
@@ -62,10 +68,16 @@ export const settlementPayloadSchema = z
     prepaymentsByGroup: z.record(z.number().finite().nonnegative()),
     balance: z.number().finite(),
     labor35a: z.number().finite().nonnegative(),
+    // Rückwärtskompatibilität für alte Snapshots; neue Berechnungen schreiben immer 0.
     roundingDifference: z.number().finite(),
     warnings: z.array(z.string()),
     blockingReasons: z.array(z.string()),
     canClose: z.boolean(),
+    // Alte Snapshots wurden noch ohne Prüfsumme gespeichert.
+    calculationToken: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     closed: z.boolean(),
     closedAt: z.string().datetime().nullable(),
     snapshotId: z.number().int().positive().nullable(),
@@ -189,7 +201,7 @@ function buildPayload(
   const calculatedCost = new Map<string, CostCalculationResult>(
     result.costs.map((cost) => [String(cost.costId), cost]),
   );
-  return settlementPayloadSchema.parse({
+  const content = {
     propertyId: input.propertyId,
     tenancyId: input.tenancyId,
     year: input.year,
@@ -221,7 +233,7 @@ function buildPayload(
         tenantShare: money(row.shareCents),
         labor35a: money(row.labor35aCents),
         allocationRounding: money(row.allocationRoundingCents),
-        isRoundingDifference: row.isRoundingDifference,
+        isRoundingDifference: false,
       };
     }),
     totalTenantShare: money(statement.totalShareCents),
@@ -234,12 +246,28 @@ function buildPayload(
     // API-Konvention: Positiv bedeutet Nachzahlung, negativ bedeutet Guthaben.
     balance: money(-statement.balanceCents),
     labor35a: money(statement.total35aCents),
-    roundingDifference: money(statement.roundingDifferenceCents),
+    roundingDifference: 0,
     warnings: result.warnings,
     blockingReasons: result.blockingReasons,
     canClose: result.canClose,
+  };
+  const calculationToken = createHash('sha256').update(JSON.stringify(content)).digest('hex');
+  return settlementPayloadSchema.parse({
+    ...content,
+    calculationToken,
     ...closure,
   });
+}
+
+function requireMatchingCalculation(
+  preview: z.infer<typeof settlementPayloadSchema>,
+  expectedToken: string,
+): void {
+  if (preview.calculationToken === expectedToken) return;
+  throw new ApiError(
+    409,
+    'Kosten, Zahlungen oder Stammdaten wurden seit der Vorschau geändert. Bitte neu berechnen.',
+  );
 }
 
 export function registerSettlementRoutes(
@@ -265,43 +293,123 @@ export function registerSettlementRoutes(
   });
 
   router.post('/settlements/close', (request, response) => {
-    const input = settlementCreateSchema.parse(request.body);
-    const existing = findSnapshot(db, input);
-    if (existing) {
-      response.json(snapshotPayload(existing));
+    const input: SettlementCloseRequest = settlementCloseSchema.parse(request.body);
+
+    if (input.correctionSnapshotId !== undefined && input.correctionRevision !== undefined) {
+      const corrected = db
+        .transaction(() => {
+          const existing = db
+            .prepare('SELECT * FROM settlement_snapshots WHERE id = ?')
+            .get(input.correctionSnapshotId) as SnapshotRow | undefined;
+          if (
+            !existing ||
+            existing.property_id !== input.propertyId ||
+            existing.tenancy_id !== input.tenancyId ||
+            existing.year !== input.year
+          ) {
+            throw new ApiError(404, 'Abrechnungssnapshot nicht gefunden.');
+          }
+          if (existing.revision !== input.correctionRevision) {
+            throw new ApiError(409, 'Der Abrechnungssnapshot wurde zwischenzeitlich geändert.', {
+              currentRevision: existing.revision,
+            });
+          }
+
+          const { result, statement, context } = calculate(db, calculator, input);
+          const currentPreview = buildPayload(input, result, statement, context, {
+            closed: false,
+            closedAt: null,
+            snapshotId: null,
+          });
+          requireMatchingCalculation(currentPreview, input.expectedCalculationToken);
+          if (!result.canClose) {
+            throw new ApiError(
+              409,
+              'Die korrigierte Abrechnung kann noch nicht abgeschlossen werden.',
+              {
+                blockingReasons: result.blockingReasons,
+                warnings: result.warnings,
+              },
+            );
+          }
+          const closedAt = new Date().toISOString();
+          const immutable = buildPayload(input, result, statement, context, {
+            closed: true,
+            closedAt,
+            snapshotId: existing.id,
+          });
+          const update = db
+            .prepare(
+              `
+            UPDATE settlement_snapshots
+            SET payload_json = ?, revision = revision + 1, created_at = ?, updated_at = ?
+            WHERE id = ? AND revision = ?
+          `,
+            )
+            .run(
+              JSON.stringify(immutable),
+              closedAt,
+              closedAt,
+              existing.id,
+              input.correctionRevision,
+            );
+          if (update.changes !== 1) {
+            throw new ApiError(409, 'Der Abrechnungssnapshot wurde zwischenzeitlich geändert.');
+          }
+          return immutable;
+        })
+        .immediate();
+      response.json(corrected);
       return;
     }
-    const { result, statement, context } = calculate(db, calculator, input);
-    if (!result.canClose) {
-      throw new ApiError(409, 'Die Abrechnung kann noch nicht abgeschlossen werden.', {
-        blockingReasons: result.blockingReasons,
-        warnings: result.warnings,
-      });
-    }
-    const payload = db.transaction(() => {
-      const closedAt = new Date().toISOString();
-      const row = db
-        .prepare(
-          `
+
+    const saved = db
+      .transaction(() => {
+        const existing = findSnapshot(db, input);
+        if (existing) {
+          const payload = snapshotPayload(existing);
+          requireMatchingCalculation(payload, input.expectedCalculationToken);
+          return { payload, created: false };
+        }
+
+        const { result, statement, context } = calculate(db, calculator, input);
+        const currentPreview = buildPayload(input, result, statement, context, {
+          closed: false,
+          closedAt: null,
+          snapshotId: null,
+        });
+        requireMatchingCalculation(currentPreview, input.expectedCalculationToken);
+        if (!result.canClose) {
+          throw new ApiError(409, 'Die Abrechnung kann noch nicht abgeschlossen werden.', {
+            blockingReasons: result.blockingReasons,
+            warnings: result.warnings,
+          });
+        }
+
+        const closedAt = new Date().toISOString();
+        const row = db
+          .prepare(
+            `
         INSERT INTO settlement_snapshots (
           property_id, tenancy_id, year, payload_json, created_at, updated_at
         ) VALUES (?, ?, ?, '{}', ?, ?)
         RETURNING *
       `,
-        )
-        .get(input.propertyId, input.tenancyId, input.year, closedAt, closedAt) as SnapshotRow;
-      const immutable = buildPayload(input, result, statement, context, {
-        closed: true,
-        closedAt,
-        snapshotId: row.id,
-      });
-      db.prepare('UPDATE settlement_snapshots SET payload_json = ? WHERE id = ?').run(
-        JSON.stringify(immutable),
-        row.id,
-      );
-      return immutable;
-    })();
-    response.status(201).json(payload);
+          )
+          .get(input.propertyId, input.tenancyId, input.year, closedAt, closedAt) as SnapshotRow;
+        const immutable = buildPayload(input, result, statement, context, {
+          closed: true,
+          closedAt,
+          snapshotId: row.id,
+        });
+        db.prepare('UPDATE settlement_snapshots SET payload_json = ? WHERE id = ?').run(
+          JSON.stringify(immutable),
+          row.id,
+        );
+        return { payload: immutable, created: true };
+      })
+      .immediate();
+    response.status(saved.created ? 201 : 200).json(saved.payload);
   });
 
   router.get('/settlements', (request, response) => {
@@ -328,6 +436,7 @@ export function registerSettlementRoutes(
         tenancyId: row.tenancy_id,
         year: row.year,
         closedAt: row.created_at,
+        revision: row.revision,
       })),
     );
   });
@@ -341,5 +450,39 @@ export function registerSettlementRoutes(
       throw new ApiError(404, 'Abrechnungssnapshot nicht gefunden.');
     }
     response.json(snapshotPayload(row));
+  });
+
+  router.post('/settlements/:id/correction', (request, response) => {
+    const snapshotId = parseId(request.params.id);
+    const propertyId = optionalId(request.query.propertyId);
+    if (propertyId === undefined) {
+      throw new ApiError(400, 'Für die Korrektur muss das zugehörige Haus angegeben werden.');
+    }
+    const expectedRevision = revisionFromIfMatch(request);
+
+    const row = db.prepare('SELECT * FROM settlement_snapshots WHERE id = ?').get(snapshotId) as
+      SnapshotRow | undefined;
+    if (!row || row.property_id !== propertyId) {
+      throw new ApiError(404, 'Abrechnungssnapshot nicht gefunden.');
+    }
+    if (row.revision !== expectedRevision) {
+      throw new ApiError(409, 'Der Abrechnungssnapshot wurde zwischenzeitlich geändert.', {
+        currentRevision: row.revision,
+      });
+    }
+
+    const input: SettlementRequest = {
+      propertyId: row.property_id,
+      tenancyId: row.tenancy_id,
+      year: row.year,
+    };
+    const { result, statement, context } = calculate(db, calculator, input);
+    const preview = buildPayload(input, result, statement, context, {
+      closed: false,
+      closedAt: null,
+      snapshotId: null,
+    });
+
+    response.json(preview);
   });
 }

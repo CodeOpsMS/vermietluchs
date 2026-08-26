@@ -46,6 +46,12 @@ export async function api<T>(path: string, request: JsonRequest = {}): Promise<T
 
 export const getJson = <T>(path: string) => api<T>(path);
 export const postJson = <T>(path: string, body: unknown) => api<T>(path, { method: 'POST', body });
+export const postJsonWithRevision = <T>(path: string, body: unknown, revision: number) =>
+  api<T>(path, {
+    method: 'POST',
+    headers: { 'If-Match': String(revision) },
+    body,
+  });
 export const putJson = <T>(path: string, body: unknown) => api<T>(path, { method: 'PUT', body });
 export const deleteJson = <T>(path: string, revision?: number) =>
   api<T>(path, {

@@ -4,14 +4,9 @@ type SettlementControlsProps = {
   eligibleTenancies: Tenancy[];
   units: Unit[];
   tenancyId: number | null;
-  roundingText: string;
-  roundingGroup: string;
-  availableGroups: string[];
   loading: boolean;
   hasPreview: boolean;
   onTenancyChange: (tenancyId: number | null) => void;
-  onRoundingTextChange: (value: string) => void;
-  onRoundingGroupChange: (value: string) => void;
   onCreatePreview: () => void;
 };
 
@@ -19,14 +14,9 @@ export default function SettlementControls({
   eligibleTenancies,
   units,
   tenancyId,
-  roundingText,
-  roundingGroup,
-  availableGroups,
   loading,
   hasPreview,
   onTenancyChange,
-  onRoundingTextChange,
-  onRoundingGroupChange,
   onCreatePreview,
 }: SettlementControlsProps) {
   return (
@@ -47,32 +37,6 @@ export default function SettlementControls({
             </option>
           ))}
         </select>
-      </label>
-      <label className="field">
-        Rundungsdifferenz
-        <input
-          inputMode="decimal"
-          value={roundingText}
-          onChange={(event) => onRoundingTextChange(event.target.value)}
-          aria-describedby="rounding-help"
-        />
-        <small id="rounding-help">Euro, −10,00 bis 10,00</small>
-      </label>
-      <label className="field">
-        Rundungsgruppe
-        <input
-          list="settlement-rounding-groups"
-          maxLength={100}
-          value={roundingGroup}
-          onChange={(event) => onRoundingGroupChange(event.target.value)}
-          required
-        />
-        <datalist id="settlement-rounding-groups">
-          {availableGroups.map((group) => (
-            <option key={group} value={group} />
-          ))}
-        </datalist>
-        <small>Vorschlag wählen oder eigene Gruppe eingeben</small>
       </label>
       <button
         className="btn btn-primary"

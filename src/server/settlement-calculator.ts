@@ -5,7 +5,6 @@ import {
   type StatementGroup,
 } from '../domain';
 import type { SqliteDatabase } from './database';
-import { eurosToCents } from './money';
 import type { SettlementCalculator } from './settlements';
 
 type Row = Record<string, unknown>;
@@ -25,8 +24,6 @@ function buildInput(
     propertyId: number;
     tenancyId: number;
     year: number;
-    roundingDifference: number;
-    roundingGroup: string;
   },
 ): BuiltSettlementInput {
   const { propertyId, year } = request;
@@ -160,17 +157,6 @@ function buildInput(
         date: String(row.date),
         value: Number(row.value),
       })),
-      roundingAdjustments:
-        request.roundingDifference === 0
-          ? []
-          : [
-              {
-                tenancyId: request.tenancyId,
-                amountCents: eurosToCents(request.roundingDifference),
-                group: request.roundingGroup as StatementGroup,
-                description: 'Rundungsdifferenz',
-              },
-            ],
     },
     missingPaymentTenantNames,
   };

@@ -1191,7 +1191,7 @@ legend {
 }
 .settlement-controls {
   display: grid;
-  grid-template-columns: minmax(230px, 1fr) minmax(155px, 0.55fr) minmax(190px, 0.7fr) auto;
+  grid-template-columns: minmax(260px, 1fr) auto;
   gap: 14px;
 }
 .settlement-controls .field {
@@ -1256,47 +1256,26 @@ legend {
   background: #fff;
   box-shadow: var(--shadow);
 }
-.settlement-closed {
-  border-top: 5px solid var(--good);
-}
-.print-letterhead,
-.print-brand,
 .address-grid,
 .document-title {
   display: flex;
-}
-.print-letterhead {
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 20px;
-  border-bottom: 2px solid var(--navy);
-}
-.print-brand {
-  gap: 10px;
-  align-items: center;
-}
-.print-brand img {
-  width: 50px;
-  height: 50px;
-}
-.print-brand span {
-  display: flex;
-  flex-direction: column;
 }
 .address-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 50px;
-  margin: 38px 0;
+  margin: 4px 0 34px;
 }
-.address-grid div {
+.address-grid address {
   display: flex;
   flex-direction: column;
+  font-style: normal;
 }
 .address-grid small {
   margin-bottom: 7px;
-  color: var(--ochre-dark);
+  color: var(--muted);
   font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .address-grid span {
@@ -1304,18 +1283,23 @@ legend {
   white-space: pre-line;
 }
 .document-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
   justify-content: space-between;
   gap: 30px;
-  align-items: end;
-  margin-bottom: 30px;
-  padding: 22px;
-  color: #fff;
-  background: var(--navy);
+  align-items: start;
+  margin-bottom: 28px;
+  padding: 0 0 16px;
+  color: var(--text);
+  border-bottom: 2px solid var(--ochre);
+  background: transparent;
 }
 .document-title p {
   margin: 0;
-  color: #c4ced9;
+  color: var(--muted);
   font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 .document-title h2 {
@@ -1323,15 +1307,21 @@ legend {
   font-size: 1.65rem;
 }
 .document-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  max-width: 55%;
+  display: grid;
+  gap: 8px;
+  margin: 0;
   text-align: right;
 }
-.document-title span,
-.document-title small {
-  color: #c4ced9;
+.document-meta dt {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.document-meta dd {
+  margin: 1px 0 0;
+  color: var(--text-soft);
   font-size: 0.8rem;
 }
 .statement-group {
@@ -1348,23 +1338,11 @@ legend {
   font-weight: 850;
   background: var(--surface-muted);
 }
-.rounding-row {
-  background: #fff4d9;
-}
-.rounding-row td:first-child {
-  box-shadow: inset 4px 0 var(--ochre);
-}
-.rounding-row small {
-  display: block;
-  margin-top: 3px;
-  color: var(--ochre-dark);
-}
 .prepayment-explanation {
   margin: 30px 0 12px;
-  padding: 18px;
-  border: 1px solid #d5dfeb;
-  border-radius: 9px;
-  background: #f2f6fa;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .prepayment-explanation h3 {
   margin-bottom: 4px;
@@ -1379,7 +1357,7 @@ legend {
   justify-content: space-between;
   gap: 20px;
   padding: 6px 0;
-  border-top: 1px solid #dce4ec;
+  border-top: 1px solid var(--line);
 }
 .settlement-total {
   margin: 32px 0;
@@ -1394,31 +1372,29 @@ legend {
 }
 .settlement-total > div:last-child {
   margin-top: 5px;
-  border: 0;
-  border-radius: 8px;
+  border-top: 2px solid var(--text);
+  border-bottom: 0;
   font-size: 1.1rem;
 }
 .balance-due {
-  color: #fff;
-  background: var(--navy);
+  color: var(--text);
+  background: transparent;
 }
 .balance-credit {
   color: var(--good);
-  background: var(--good-bg);
+  background: transparent;
 }
 .tax-note {
-  padding: 18px;
-  border-left: 4px solid var(--ochre);
-  background: #f8f1e5;
+  padding: 14px 0 14px 14px;
+  border-left: 3px solid var(--ochre);
 }
 .tax-note p {
   margin: 6px 0 0;
 }
 .payment-request {
   margin-top: 28px;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--line);
 }
 .payment-request > p {
   margin-bottom: 14px;
@@ -1448,24 +1424,22 @@ legend {
   color: var(--muted);
 }
 .print-warnings {
-  padding: 10px 14px;
+  padding: 8px 0 8px 12px;
   color: var(--warn);
-  border: 1px solid color-mix(in srgb, var(--warn) 52%, var(--line));
-  background: var(--warn-bg);
+  border-left: 3px solid var(--warn);
+  background: transparent;
 }
 .print-warnings p {
   margin: 4px 0;
 }
 .print-blocking {
   color: var(--bad);
-  border-color: color-mix(in srgb, var(--bad) 52%, var(--line));
-  background: var(--bad-bg);
+  border-color: var(--bad);
 }
 .print-notes {
   margin: 12px 0;
-  padding: 12px 14px;
-  border-left: 3px solid #8aa8c7;
-  background: #f2f6fa;
+  padding: 10px 0 10px 12px;
+  border-left: 3px solid var(--line);
 }
 .print-notes ul {
   margin: 7px 0 0;
@@ -1577,6 +1551,13 @@ legend {
   }
   .settlement-controls {
     grid-template-columns: 1fr 1fr;
+  }
+  .document-title {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  .document-meta {
+    text-align: left;
   }
 }
 
@@ -1753,9 +1734,6 @@ legend {
   .settlement-paper {
     padding: 22px 15px;
   }
-  .print-letterhead {
-    align-items: flex-start;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1806,9 +1784,6 @@ legend {
     background: #fff;
     box-shadow: none;
   }
-  .print-letterhead {
-    padding-top: 0;
-  }
   .statement-group,
   .tax-note,
   .settlement-total,
@@ -1823,6 +1798,26 @@ legend {
   .statement-group th,
   .statement-group td {
     padding: 6px 5px;
+  }
+  .document-title,
+  .balance-due,
+  .balance-credit,
+  .prepayment-explanation,
+  .tax-note,
+  .payment-request,
+  .print-warnings,
+  .print-notes {
+    color: #111 !important;
+    background: transparent !important;
+  }
+  .table-wrap {
+    overflow: visible;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
   }
   .status {
     border: 1px solid #aaa;

@@ -291,7 +291,7 @@ describe('Vorauszahlungen und Abrechnungsstatus', () => {
       startDate: '2024-01-01',
       prepaymentOverridesByGroupCents: { Wohnung: -1 },
     };
-    expect(() => calculatePrepayments(tenancy, 2025)).toThrow(/nichtnegativer Centbetrag/);
+    expect(() => calculatePrepayments(tenancy, 2025)).toThrow(/nichtnegativer sicherer Centbetrag/);
     expect(() =>
       calculatePrepayments(
         {
@@ -300,7 +300,7 @@ describe('Vorauszahlungen und Abrechnungsstatus', () => {
         },
         2025,
       ),
-    ).toThrow(/nichtnegativer Centbetrag/);
+    ).toThrow(/nichtnegativer sicherer Centbetrag/);
   });
 
   test('Kosten anderer Kalenderjahre werden ignoriert', () => {

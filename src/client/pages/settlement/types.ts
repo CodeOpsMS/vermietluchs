@@ -2,8 +2,12 @@ export type SettlementRequest = {
   propertyId: number;
   tenancyId: number;
   year: number;
-  roundingDifference: number;
-  roundingGroup: string;
+};
+
+export type SettlementCloseRequest = SettlementRequest & {
+  expectedCalculationToken: string;
+  correctionSnapshotId?: number;
+  correctionRevision?: number;
 };
 
 export type SettlementArchiveItem = {
@@ -12,4 +16,5 @@ export type SettlementArchiveItem = {
   tenancyId: number;
   year: number;
   closedAt: string;
+  revision: number;
 };

@@ -92,13 +92,6 @@ export interface SettlementReading {
   oldEndValue?: number;
 }
 
-export interface VisibleRoundingAdjustment {
-  tenancyId: DomainId;
-  amountCents: number;
-  group?: StatementGroup;
-  description?: string;
-}
-
 export interface SettlementInput {
   year: number;
   units: SettlementUnit[];
@@ -106,26 +99,20 @@ export interface SettlementInput {
   costs: SettlementCost[];
   meters?: SettlementMeter[];
   readings?: SettlementReading[];
-  /**
-   * Explizite, auf der Mieterabrechnung sichtbare Cent-Korrektur, z. B. wenn
-   * veröffentlichte Gruppensummen 1 Cent vom vorgegebenen Gesamtbetrag abweichen.
-   */
-  roundingAdjustments?: VisibleRoundingAdjustment[];
 }
 
 export interface SettlementRow {
   costId: DomainId | null;
   group: StatementGroup;
   description: string;
-  allocationMode: AllocationMode | 'rounding';
-  allocationKey: AllocationKey | 'rounding';
+  allocationMode: AllocationMode;
+  allocationKey: AllocationKey;
   basisText: string;
   rawShareCents: number;
   shareCents: number;
   /** Abweichung zur normalen kaufmännischen Rundung durch centgenaue Restverteilung. */
   allocationRoundingCents: number;
   labor35aCents: number;
-  isRoundingDifference: boolean;
 }
 
 export interface SettlementGroupResult {
@@ -150,8 +137,6 @@ export interface TenancyStatement {
   groups: SettlementGroupResult[];
   prepaymentCents: number;
   prepaymentsByGroup: Record<string, number>;
-  totalCostShareBeforeRoundingCents: number;
-  roundingDifferenceCents: number;
   totalShareCents: number;
   total35aCents: number;
   /** Positiv = Guthaben, negativ = Nachzahlung. */
@@ -195,8 +180,6 @@ export interface SettlementResult {
   costs: CostCalculationResult[];
   totalSourceCostsCents: number;
   totalIncludedAllocableCents: number;
-  totalTenantCostShareCents: number;
-  totalVisibleRoundingDifferenceCents: number;
   totalTenantShareCents: number;
   pendingCostsCents: number;
   canClose: boolean;

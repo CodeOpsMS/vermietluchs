@@ -535,13 +535,25 @@ describe('HTTP-API und SQLite-Persistenz', () => {
     expect(preview.body.warnings).toContain(
       'Im Mietkonto sind für „Mieter A“ keine Zahlungen erfasst; Vorauszahlungen werden mit 0,00 € berücksichtigt.',
     );
-    const closed = await request(app).post('/api/settlements/close').send(input).expect(201);
+    await request(app)
+      .post('/api/settlements/close')
+      .send({ ...input, expectedCalculationToken: '0'.repeat(64) })
+      .expect(409);
+    expect((await request(app).get(`/api/settlements?propertyId=${property.id}`)).body).toEqual([]);
+    const closed = await request(app)
+      .post('/api/settlements/close')
+      .send({ ...input, expectedCalculationToken: preview.body.calculationToken })
+      .expect(201);
     expect(closed.body).toMatchObject({
       tenancyId: tenancy.id,
       totalTenantShare: 1800,
       closed: true,
     });
     expect(closed.body.snapshotId).toBeTypeOf('number');
+    await request(app)
+      .post('/api/settlements/close')
+      .send({ ...input, expectedCalculationToken: '0'.repeat(64) })
+      .expect(409);
     await request(app)
       .put(`/api/properties/${property.id}`)
       .send({
@@ -571,12 +583,26 @@ describe('HTTP-API und SQLite-Persistenz', () => {
         revision: 0,
       })
       .expect(200);
+    await request(app)
+      .put('/api/settings')
+      .send({
+        landlordName: 'Aktueller Vermieter',
+        landlordAddress: 'Neue Adresse 2',
+        bankAccountHolder: 'Aktueller Vermieter',
+        bankIban: 'DE0011223344',
+        paymentDeadlineDays: 14,
+        revision: 0,
+      })
+      .expect(200);
     const frozenPreview = await request(app)
       .post('/api/settlements/preview')
-      .send({ ...input, roundingDifference: 9 })
+      .send(input)
       .expect(200);
     expect(frozenPreview.body).toEqual(closed.body);
-    const duplicate = await request(app).post('/api/settlements/close').send(input).expect(200);
+    const duplicate = await request(app)
+      .post('/api/settlements/close')
+      .send({ ...input, expectedCalculationToken: closed.body.calculationToken })
+      .expect(200);
     expect(duplicate.body).toEqual(closed.body);
     const fetched = await request(app)
       .get(`/api/settlements/${closed.body.snapshotId}?propertyId=${property.id}`)
@@ -585,6 +611,260 @@ describe('HTTP-API und SQLite-Persistenz', () => {
     await request(app)
       .get(`/api/settlements/${closed.body.snapshotId}?propertyId=${property.id + 999}`)
       .expect(404);
+
+    const archive = await request(app)
+      .get(`/api/settlements?propertyId=${property.id}`)
+      .expect(200);
+    expect(archive.body).toEqual([
+      expect.objectContaining({ snapshotId: closed.body.snapshotId, revision: 0 }),
+    ]);
+    await request(app)
+      .post(`/api/settlements/${closed.body.snapshotId}/correction?propertyId=${property.id}`)
+      .send({})
+      .expect(428);
+    await request(app)
+      .post(`/api/settlements/${closed.body.snapshotId}/correction?propertyId=${property.id + 999}`)
+      .set('If-Match', '0')
+      .send({})
+      .expect(404);
+    const conflict = await request(app)
+      .post(`/api/settlements/${closed.body.snapshotId}/correction?propertyId=${property.id}`)
+      .set('If-Match', '99')
+      .send({})
+      .expect(409);
+    expect(conflict.body.details.currentRevision).toBe(0);
+
+    const corrected = await request(app)
+      .post(`/api/settlements/${closed.body.snapshotId}/correction?propertyId=${property.id}`)
+      .set('If-Match', '0')
+      .send({})
+      .expect(200);
+    expect(corrected.body).toMatchObject({
+      propertyName: 'Später geändert',
+      landlordName: 'Aktueller Vermieter',
+      landlordAddress: 'Neue Adresse 2',
+      totalTenantShare: 999,
+      closed: false,
+      closedAt: null,
+      snapshotId: null,
+    });
+    const stillArchived = await request(app)
+      .get(`/api/settlements/${closed.body.snapshotId}?propertyId=${property.id}`)
+      .expect(200);
+    expect(stillArchived.body).toEqual(closed.body);
+
+    await request(app)
+      .put('/api/settings')
+      .send({
+        landlordName: 'Aktueller Vermieter',
+        landlordAddress: 'Kurzzeitig geänderte Adresse',
+        bankAccountHolder: 'Aktueller Vermieter',
+        bankIban: 'DE0011223344',
+        paymentDeadlineDays: 14,
+        revision: 1,
+      })
+      .expect(200);
+    await request(app)
+      .post('/api/settlements/close')
+      .send({
+        ...input,
+        expectedCalculationToken: corrected.body.calculationToken,
+        correctionSnapshotId: closed.body.snapshotId,
+        correctionRevision: 0,
+      })
+      .expect(409);
+    expect(
+      (
+        await request(app)
+          .get(`/api/settlements/${closed.body.snapshotId}?propertyId=${property.id}`)
+          .expect(200)
+      ).body,
+    ).toEqual(closed.body);
+    expect(
+      (await request(app).get(`/api/settlements?propertyId=${property.id}`).expect(200)).body[0],
+    ).toMatchObject({ snapshotId: closed.body.snapshotId, revision: 0 });
+
+    await request(app)
+      .put('/api/settings')
+      .send({
+        landlordName: 'Aktueller Vermieter',
+        landlordAddress: 'Neue Adresse 2',
+        bankAccountHolder: 'Aktueller Vermieter',
+        bankIban: 'DE0011223344',
+        paymentDeadlineDays: 14,
+        revision: 2,
+      })
+      .expect(200);
+    const refreshedCorrection = await request(app)
+      .post(`/api/settlements/${closed.body.snapshotId}/correction?propertyId=${property.id}`)
+      .set('If-Match', '0')
+      .send({})
+      .expect(200);
+
+    const correctedClose = await request(app)
+      .post('/api/settlements/close')
+      .send({
+        ...input,
+        expectedCalculationToken: refreshedCorrection.body.calculationToken,
+        correctionSnapshotId: closed.body.snapshotId,
+        correctionRevision: 0,
+      })
+      .expect(200);
+    expect(correctedClose.body).toMatchObject({
+      snapshotId: closed.body.snapshotId,
+      landlordName: 'Aktueller Vermieter',
+      totalTenantShare: 999,
+      closed: true,
+    });
+    const correctedArchive = await request(app)
+      .get(`/api/settlements?propertyId=${property.id}`)
+      .expect(200);
+    expect(correctedArchive.body[0]).toMatchObject({
+      snapshotId: closed.body.snapshotId,
+      revision: 1,
+    });
+    await request(app)
+      .post(`/api/settlements/${closed.body.snapshotId}/correction?propertyId=${property.id}`)
+      .set('If-Match', '0')
+      .send({})
+      .expect(409);
+
+    await request(app)
+      .put(`/api/costs/${cost.id}`)
+      .send({
+        propertyId: property.id,
+        year: 2024,
+        descriptionInternal: 'Geändert',
+        descriptionTenant: 'Geändert',
+        sourceAmount: 999,
+        tenantStatus: 'pending',
+        allocableAmount: 999,
+        statementGroup: 'Wohnung',
+        allocationMode: 'fixedTenancy',
+        allocationKey: 'direct',
+        directUnitId: null,
+        directTenancyId: tenancy.id,
+        meterType: null,
+        labor35a: 0,
+        notes: '',
+        revision: 1,
+      })
+      .expect(200);
+    const blockedCorrection = await request(app)
+      .post(`/api/settlements/${closed.body.snapshotId}/correction?propertyId=${property.id}`)
+      .set('If-Match', '1')
+      .send({})
+      .expect(200);
+    expect(blockedCorrection.body).toMatchObject({ closed: false, canClose: false });
+    await request(app)
+      .post('/api/settlements/close')
+      .send({
+        ...input,
+        expectedCalculationToken: blockedCorrection.body.calculationToken,
+        correctionSnapshotId: closed.body.snapshotId,
+        correctionRevision: 1,
+      })
+      .expect(409);
+    const retainedAfterBlockedCorrection = await request(app)
+      .get(`/api/settlements/${closed.body.snapshotId}?propertyId=${property.id}`)
+      .expect(200);
+    expect(retainedAfterBlockedCorrection.body).toEqual(correctedClose.body);
+    await request(app)
+      .put(`/api/costs/${cost.id}`)
+      .send({
+        propertyId: property.id,
+        year: 2024,
+        descriptionInternal: 'Geändert',
+        descriptionTenant: 'Geändert',
+        sourceAmount: 999,
+        tenantStatus: 'included',
+        allocableAmount: 999,
+        statementGroup: 'Wohnung',
+        allocationMode: 'fixedTenancy',
+        allocationKey: 'direct',
+        directUnitId: null,
+        directTenancyId: tenancy.id,
+        meterType: null,
+        labor35a: 0,
+        notes: '',
+        revision: 2,
+      })
+      .expect(200);
+
+    const legacyPayload = {
+      ...correctedClose.body,
+      rows: [
+        ...correctedClose.body.rows,
+        {
+          id: null,
+          description: 'Rundungsdifferenz',
+          statementGroup: 'Wohnung',
+          allocationLabel: 'Alter Excel-Ausgleich',
+          sourceAmount: 0,
+          allocableAmount: 0,
+          tenantShare: 0.01,
+          labor35a: 0,
+          allocationRounding: 0,
+          isRoundingDifference: true,
+        },
+      ],
+      totalTenantShare: 999.01,
+      balance: 999.01,
+      roundingDifference: 0.01,
+    };
+    db.prepare('UPDATE settlement_snapshots SET payload_json = ? WHERE id = ?').run(
+      JSON.stringify(legacyPayload),
+      correctedClose.body.snapshotId,
+    );
+    const legacy = await request(app)
+      .get(`/api/settlements/${correctedClose.body.snapshotId}?propertyId=${property.id}`)
+      .expect(200);
+    expect(legacy.body).toMatchObject({ roundingDifference: 0.01, totalTenantShare: 999.01 });
+    expect(legacy.body.rows.at(-1).isRoundingDifference).toBe(true);
+
+    const legacyCorrection = await request(app)
+      .post(
+        `/api/settlements/${correctedClose.body.snapshotId}/correction?propertyId=${property.id}`,
+      )
+      .set('If-Match', '1')
+      .send({})
+      .expect(200);
+    expect(legacyCorrection.body).toMatchObject({
+      closed: false,
+      roundingDifference: 0,
+      totalTenantShare: 999,
+    });
+    expect(
+      legacyCorrection.body.rows.every(
+        (row: { isRoundingDifference: boolean }) => !row.isRoundingDifference,
+      ),
+    ).toBe(true);
+    const legacyCorrectedClose = await request(app)
+      .post('/api/settlements/close')
+      .send({
+        ...input,
+        expectedCalculationToken: legacyCorrection.body.calculationToken,
+        correctionSnapshotId: correctedClose.body.snapshotId,
+        correctionRevision: 1,
+      })
+      .expect(200);
+    expect(legacyCorrectedClose.body).toMatchObject({
+      roundingDifference: 0,
+      totalTenantShare: 999,
+      closed: true,
+    });
+    expect(
+      legacyCorrectedClose.body.rows.every(
+        (row: { isRoundingDifference: boolean }) => !row.isRoundingDifference,
+      ),
+    ).toBe(true);
+    const finalArchive = await request(app)
+      .get(`/api/settlements?propertyId=${property.id}`)
+      .expect(200);
+    expect(finalArchive.body[0]).toMatchObject({
+      snapshotId: closed.body.snapshotId,
+      revision: 2,
+    });
   });
 
   test('offene Prüfpositionen erlauben Preview, blockieren aber Close', async () => {
@@ -616,8 +896,62 @@ describe('HTTP-API und SQLite-Persistenz', () => {
     const input = { propertyId: property.id, tenancyId: tenancy.id, year: 2024 };
     const preview = await request(app).post('/api/settlements/preview').send(input).expect(200);
     expect(preview.body).toMatchObject({ canClose: false, closed: false });
-    const closed = await request(app).post('/api/settlements/close').send(input).expect(409);
+    const closed = await request(app)
+      .post('/api/settlements/close')
+      .send({ ...input, expectedCalculationToken: preview.body.calculationToken })
+      .expect(409);
     expect(closed.body.details.blockingReasons.length).toBeGreaterThan(0);
+  });
+
+  test('verwirft den Abschluss, wenn sich Stammdaten seit der Vorschau geändert haben', async () => {
+    const property = await createProperty();
+    const unit = await createUnit(property.id);
+    const tenancy = (
+      await request(app).post('/api/tenancies').send(tenancyInput(unit.id)).expect(201)
+    ).body;
+    await request(app)
+      .post('/api/costs')
+      .send({
+        propertyId: property.id,
+        year: 2024,
+        descriptionInternal: 'Grundsteuer',
+        descriptionTenant: 'Grundsteuer',
+        sourceAmount: 100,
+        tenantStatus: 'included',
+        allocableAmount: 100,
+        statementGroup: 'Grundsteuer',
+        allocationMode: 'fixedTenancy',
+        allocationKey: 'direct',
+        directUnitId: null,
+        directTenancyId: tenancy.id,
+        meterType: null,
+        labor35a: 0,
+        notes: '',
+      })
+      .expect(201);
+
+    const input = { propertyId: property.id, tenancyId: tenancy.id, year: 2024 };
+    const oldPreview = await request(app).post('/api/settlements/preview').send(input).expect(200);
+    await request(app)
+      .put(`/api/properties/${property.id}`)
+      .send({ ...propertyInput, name: 'Haus nach Prüfung geändert', revision: 0 })
+      .expect(200);
+
+    await request(app)
+      .post('/api/settlements/close')
+      .send({ ...input, expectedCalculationToken: oldPreview.body.calculationToken })
+      .expect(409);
+    expect((await request(app).get(`/api/settlements?propertyId=${property.id}`)).body).toEqual([]);
+
+    const currentPreview = await request(app)
+      .post('/api/settlements/preview')
+      .send(input)
+      .expect(200);
+    expect(currentPreview.body.propertyName).toBe('Haus nach Prüfung geändert');
+    await request(app)
+      .post('/api/settlements/close')
+      .send({ ...input, expectedCalculationToken: currentPreview.body.calculationToken })
+      .expect(201);
   });
 
   test('fehlende Zahlungen eines anderen Mieters erscheinen nicht in der gewählten Abrechnung', async () => {
@@ -844,7 +1178,7 @@ describe('HTTP-API und SQLite-Persistenz', () => {
       .expect(400);
   });
 
-  test('sichtbare Rundungsdifferenz von einem Cent erzeugt exakt 119,70 Euro Nachzahlung', async () => {
+  test('Excel-Einzelwerte ergeben ohne manuellen Zusatzcent exakt 119,69 Euro Nachzahlung', async () => {
     const property = await createProperty();
     const unit = await createUnit(property.id);
     const tenancy = (
@@ -898,39 +1232,40 @@ describe('HTTP-API und SQLite-Persistenz', () => {
     }
     const preview = await request(app)
       .post('/api/settlements/preview')
-      .send({
-        propertyId: property.id,
-        tenancyId: tenancy.id,
-        year: 2024,
-        roundingDifference: 0.01,
-        roundingGroup: 'Wohnung',
-      })
+      .send({ propertyId: property.id, tenancyId: tenancy.id, year: 2024 })
       .expect(200);
     expect(preview.body).toMatchObject({
-      totalTenantShare: 1169.7,
+      totalTenantShare: 1169.69,
       totalPrepayments: 1050,
       utilityPrepayments: 1050,
       garagePrepayments: 0,
-      balance: 119.7,
-      roundingDifference: 0.01,
+      balance: 119.69,
+      roundingDifference: 0,
     });
     expect(
-      preview.body.rows
-        .filter((row: { isRoundingDifference: boolean }) => !row.isRoundingDifference)
-        .map((row: { statementGroup: string; tenantShare: number }) => [
-          row.statementGroup,
-          row.tenantShare,
-        ]),
+      preview.body.rows.map((row: { statementGroup: string; tenantShare: number }) => [
+        row.statementGroup,
+        row.tenantShare,
+      ]),
     ).toEqual([
       ['Wohnung', 1102.7],
       ['Garage', 4.99],
       ['Grundsteuer', 62],
     ]);
-    expect(preview.body.rows.at(-1)).toMatchObject({
-      statementGroup: 'Wohnung',
-      tenantShare: 0.01,
-      isRoundingDifference: true,
-    });
+    expect(
+      preview.body.rows.every(
+        (row: { isRoundingDifference: boolean }) => !row.isRoundingDifference,
+      ),
+    ).toBe(true);
+    await request(app)
+      .post('/api/settlements/preview')
+      .send({
+        propertyId: property.id,
+        tenancyId: tenancy.id,
+        year: 2024,
+        roundingDifference: 0.01,
+      })
+      .expect(400);
   });
 
   test('Objekte bleiben in Berechnung und effektiven Absenderdaten strikt getrennt', async () => {

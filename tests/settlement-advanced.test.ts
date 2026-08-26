@@ -50,7 +50,7 @@ describe('Interne und externe Kostensicht', () => {
     input.costs.push(fixedCost(1, 10_000, 'Wohnung', { allocableAmountCents: 6_000 }));
     const result = calculateSettlement(input);
     expect(result.totalSourceCostsCents).toBe(10_000);
-    expect(result.totalTenantCostShareCents).toBe(6_000);
+    expect(result.totalTenantShareCents).toBe(6_000);
     expect(result.owner.totalCents).toBe(4_000);
     expect(result.owner.rows[0].reason).toBe('not-allocable');
   });
@@ -152,24 +152,19 @@ describe('Abrechnungsgruppen, §35a und Rundung', () => {
     expect(statement.prepaymentCents).toBe(106_000);
   });
 
-  test('sichtbare Rundungsdifferenz stimmt Mail-Gesamtsumme auf einen Cent ab', () => {
+  test('Excel-Einzelwerte ergeben ohne künstlichen Zusatzcent exakt 1.169,69 Euro', () => {
     const input = singleTenancyInput();
     input.costs.push(
       fixedCost(1, 110_270, 'Wohnung'),
       fixedCost(2, 499, 'Garage'),
       fixedCost(3, 6_200, 'Grundsteuer'),
     );
-    input.roundingAdjustments = [{ tenancyId: 1, amountCents: 1 }];
     const result = calculateSettlement(input);
     const statement = result.statements[0];
-    expect(statement.totalCostShareBeforeRoundingCents).toBe(116_969);
-    expect(statement.roundingDifferenceCents).toBe(1);
-    expect(statement.totalShareCents).toBe(116_970);
-    expect(statement.balanceCents).toBe(-11_970);
-    expect(statement.rows.find((row) => row.isRoundingDifference)?.description).toBe(
-      'Rundungsdifferenz',
-    );
-    expect(result.totalVisibleRoundingDifferenceCents).toBe(1);
+    expect(statement.totalShareCents).toBe(116_969);
+    expect(statement.prepaymentCents).toBe(105_000);
+    expect(statement.balanceCents).toBe(-11_969);
+    expect(result.totalTenantShareCents).toBe(116_969);
   });
 
   test('§35a-Anteil folgt dem Mieteranteil centgenau', () => {

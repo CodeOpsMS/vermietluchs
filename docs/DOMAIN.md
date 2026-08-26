@@ -79,15 +79,18 @@ kann. Ein solcher Teilmonat muss bei Bedarf im Mietkonto angepasst werden.
 
 ## Rundung
 
-Intern rechnet die Fachlogik präzise und rundet Geldbeträge auf Cent. Eine aus
-einer extern vorgegebenen Gesamtsumme bekannte Differenz wird im
-Abrechnungsdialog ausdrücklich eingegeben. Sie wird nicht heimlich auf eine
-Position aufgeschlagen, sondern als `Rundungsdifferenz` ausgewiesen. Beispiel:
+Die Fachberechnung führt alle Geldbeträge als ganzzahlige Centbeträge. Muss ein
+Betrag auf mehrere Mietverhältnisse verteilt werden, weist das
+Hare-/Größter-Rest-Verfahren auch die letzten Cent deterministisch zu. Die
+verteilten Anteile ergeben deshalb immer exakt den zu verteilenden Betrag.
+
+Eine manuelle Rundungsdifferenz gibt es nicht. Die drei früher aus Excel
+übernommenen Werte ergeben rechnerisch:
 
 ```text
-Umlagefähige Kosten  1.169,70 €
+1.102,70 € + 4,99 € + 62,00 € = 1.169,69 €
 Vorauszahlungen      1.050,00 €
-Nachzahlung            119,70 €
+Nachzahlung            119,69 €
 ```
 
 ## Abschluss
@@ -98,6 +101,16 @@ vollständige Schreiben einschließlich Vermieter-, Objekt-, Mieter-, Bank- und
 Berechnungsdaten als unveränderlicher JSON-Snapshot gespeichert. Künftige
 Änderungen an Namen, Kosten, Zahlungen oder Zählerständen verändern diesen
 Snapshot nicht.
+
+Jede Vorschau enthält eine Prüfsumme ihrer Eingaben und Ergebnisse. Haben sich
+Kosten, Zahlungen oder Stammdaten bis zum Abschluss geändert, lehnt der Server
+den Abschluss ab und verlangt eine neue Vorschau. So wird genau der geprüfte
+Stand gespeichert.
+
+Soll ein Abschluss berichtigt werden, wird er ausdrücklich „zur Korrektur
+geöffnet“. Während die neue Vorschau geprüft wird, bleibt der alte Snapshot
+unverändert erhalten. Erst der erneute Abschluss ersetzt ihn atomar und erhöht
+seine Revision. Vorher empfiehlt die Oberfläche zusätzlich ein JSON-Backup.
 
 Bei einem Mietverhältnis, das nicht das ganze Jahr umfasst, wird keine
 automatische monatliche Vorauszahlung für das Folgejahr vorgeschlagen.

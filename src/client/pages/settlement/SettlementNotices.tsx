@@ -4,9 +4,14 @@ import type { SettlementPreview } from '../../types';
 type SettlementNoticesProps = {
   pendingCostCount: number;
   preview: SettlementPreview | null;
+  isCorrection: boolean;
 };
 
-export default function SettlementNotices({ pendingCostCount, preview }: SettlementNoticesProps) {
+export default function SettlementNotices({
+  pendingCostCount,
+  preview,
+  isCorrection,
+}: SettlementNoticesProps) {
   return (
     <>
       {pendingCostCount > 0 && !preview && (
@@ -20,7 +25,23 @@ export default function SettlementNotices({ pendingCostCount, preview }: Settlem
       {preview?.closed && (
         <Notice kind="success">
           <strong>Diese Abrechnung ist abgeschlossen.</strong> Die Druckansicht verwendet den
-          gespeicherten Snapshot{preview.snapshotId ? ` Nr. ${preview.snapshotId}` : ''}.
+          gespeicherten Stand{preview.snapshotId ? ` Nr. ${preview.snapshotId}` : ''}. Auch die
+          Vermieterdaten sind darin fest gespeichert. Wenn sie geändert werden sollen, öffne die
+          Abrechnung oben ausdrücklich zur Korrektur.
+        </Notice>
+      )}
+      {preview?.closed && preview.roundingDifference !== 0 && (
+        <Notice kind="warning">
+          <strong>Älterer Abrechnungsstand:</strong> Dieser Abschluss enthält noch eine manuelle
+          Excel-Rundungsdifferenz. Öffne ihn zur Korrektur, damit die App ihn ohne diesen Zusatzcent
+          neu berechnet.
+        </Notice>
+      )}
+      {isCorrection && preview && !preview.closed && (
+        <Notice kind="warning">
+          <strong>Korrekturvorschau:</strong> Der bisherige Abschluss bleibt im Archiv erhalten. Er
+          wird erst ersetzt, wenn du diese Vorschau erneut abschließt. Drucken ist bis dahin
+          gesperrt.
         </Notice>
       )}
       {(preview?.blockingReasons.length ?? 0) > 0 && (

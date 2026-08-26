@@ -87,7 +87,8 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
             </div>
             <p className="section-copy">
               Diese Angaben gelten als Vorgabe. Bei Bedarf können Häuser später eigene Angaben
-              überschreiben.
+              überschreiben. Bereits abgeschlossene Abrechnungen behalten ihren damaligen Absender;
+              sie müssen für eine Änderung ausdrücklich zur Korrektur geöffnet werden.
             </p>
             <form
               className="form-grid"

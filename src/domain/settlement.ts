@@ -44,8 +44,8 @@ interface MeterBasis {
 }
 
 function assertCents(value: number, field: string): void {
-  if (!Number.isInteger(value) || value < 0) {
-    throw new TypeError(`${field} muss ein nichtnegativer ganzzahliger Centbetrag sein.`);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError(`${field} muss ein nichtnegativer sicherer ganzzahliger Centbetrag sein.`);
   }
 }
 
@@ -104,8 +104,6 @@ function createStatements(
       groups: [],
       prepaymentCents: prepayment.totalCents,
       prepaymentsByGroup: prepayment.byGroup,
-      totalCostShareBeforeRoundingCents: 0,
-      roundingDifferenceCents: 0,
       totalShareCents: 0,
       total35aCents: 0,
       balanceCents: 0,
@@ -358,7 +356,6 @@ function tenantRow(
     shareCents: share.cents,
     allocationRoundingCents: share.allocationRoundingCents,
     labor35aCents,
-    isRoundingDifference: false,
   };
 }
 
@@ -458,52 +455,10 @@ function createGroups(rows: SettlementRow[]): SettlementGroupResult[] {
   });
 }
 
-function finishStatements(
-  input: SettlementInput,
-  statements: Map<DomainId, TenancyStatement>,
-  warnings: string[],
-): void {
-  for (const adjustment of input.roundingAdjustments ?? []) {
-    if (!Number.isInteger(adjustment.amountCents)) {
-      throw new TypeError(
-        'Eine sichtbare Rundungsdifferenz muss ein ganzzahliger Centbetrag sein.',
-      );
-    }
-    const statement = statements.get(adjustment.tenancyId);
-    if (!statement) {
-      uniquePush(
-        warnings,
-        `Rundungsdifferenz: Mietverhältnis ${adjustment.tenancyId} liegt nicht im Abrechnungsjahr.`,
-      );
-      continue;
-    }
-    statement.rows.push({
-      costId: null,
-      group: adjustment.group ?? 'Wohnung',
-      description: adjustment.description ?? 'Rundungsdifferenz',
-      allocationMode: 'rounding',
-      allocationKey: 'rounding',
-      basisText: 'Sichtbare Abstimmung zur vorgegebenen Gesamtsumme',
-      rawShareCents: adjustment.amountCents,
-      shareCents: adjustment.amountCents,
-      allocationRoundingCents: 0,
-      labor35aCents: 0,
-      isRoundingDifference: true,
-    });
-  }
-
+function finishStatements(statements: Map<DomainId, TenancyStatement>): void {
   for (const statement of statements.values()) {
-    const costRows = statement.rows.filter((row) => !row.isRoundingDifference);
-    statement.totalCostShareBeforeRoundingCents = costRows.reduce(
-      (sum, row) => sum + row.shareCents,
-      0,
-    );
-    statement.roundingDifferenceCents = statement.rows
-      .filter((row) => row.isRoundingDifference)
-      .reduce((sum, row) => sum + row.shareCents, 0);
-    statement.totalShareCents =
-      statement.totalCostShareBeforeRoundingCents + statement.roundingDifferenceCents;
-    statement.total35aCents = costRows.reduce((sum, row) => sum + row.labor35aCents, 0);
+    statement.totalShareCents = statement.rows.reduce((sum, row) => sum + row.shareCents, 0);
+    statement.total35aCents = statement.rows.reduce((sum, row) => sum + row.labor35aCents, 0);
     statement.balanceCents = statement.prepaymentCents - statement.totalShareCents;
     statement.suggestedMonthlyPrepaymentCents = statement.isPartialYear
       ? null
@@ -596,19 +551,15 @@ export function calculateSettlement(input: SettlementInput): SettlementResult {
     costResults.push(calculateIncludedCost(cost, targets, statements, ownerRows, warnings));
   }
 
-  finishStatements(input, statements, warnings);
+  finishStatements(statements);
   const statementList = [...statements.values()].sort(
     (left, right) =>
       left.unitName.localeCompare(right.unitName, 'de') ||
       left.periodStart.localeCompare(right.periodStart) ||
       left.tenantName.localeCompare(right.tenantName, 'de'),
   );
-  const totalTenantCostShareCents = statementList.reduce(
-    (sum, statement) => sum + statement.totalCostShareBeforeRoundingCents,
-    0,
-  );
-  const totalVisibleRoundingDifferenceCents = statementList.reduce(
-    (sum, statement) => sum + statement.roundingDifferenceCents,
+  const totalTenantShareCents = statementList.reduce(
+    (sum, statement) => sum + statement.totalShareCents,
     0,
   );
 
@@ -628,9 +579,7 @@ export function calculateSettlement(input: SettlementInput): SettlementResult {
     totalIncludedAllocableCents: costs
       .filter((cost) => cost.tenantStatus === 'included')
       .reduce((sum, cost) => sum + cost.allocableAmountCents, 0),
-    totalTenantCostShareCents,
-    totalVisibleRoundingDifferenceCents,
-    totalTenantShareCents: totalTenantCostShareCents + totalVisibleRoundingDifferenceCents,
+    totalTenantShareCents,
     pendingCostsCents: costResults.reduce((sum, cost) => sum + cost.pendingCents, 0),
     canClose: blockingReasons.length === 0,
     blockingReasons,

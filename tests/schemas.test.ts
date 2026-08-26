@@ -4,6 +4,7 @@ import {
   costInputSchema,
   dateSchema,
   paymentInputSchema,
+  settlementCloseSchema,
   settlementCreateSchema,
 } from '../src/shared/schemas';
 
@@ -83,10 +84,38 @@ describe('gemeinsame Eingaberegeln', () => {
     expect(result.success).toBe(false);
   });
 
-  test('setzt die sichtbare Rundungsdifferenz standardmäßig auf null', () => {
+  test('akzeptiert nur Haus, Mietverhältnis und Jahr für eine Abrechnung', () => {
     const parsed = settlementCreateSchema.parse({ propertyId: 1, tenancyId: 2, year: 2024 });
-    expect(parsed.roundingDifference).toBe(0);
-    expect(parsed.roundingGroup).toBe('Wohnung');
+    expect(parsed).toEqual({ propertyId: 1, tenancyId: 2, year: 2024 });
+    expect(
+      settlementCreateSchema.safeParse({
+        propertyId: 1,
+        tenancyId: 2,
+        year: 2024,
+        roundingDifference: 0.01,
+      }).success,
+    ).toBe(false);
+  });
+
+  test('verlangt bei einem Korrekturabschluss Snapshot-ID und Revision gemeinsam', () => {
+    const base = {
+      propertyId: 1,
+      tenancyId: 2,
+      year: 2024,
+      expectedCalculationToken: 'a'.repeat(64),
+    };
+    expect(settlementCloseSchema.safeParse(base).success).toBe(true);
+    expect(
+      settlementCloseSchema.safeParse({
+        ...base,
+        correctionSnapshotId: 3,
+        correctionRevision: 4,
+      }).success,
+    ).toBe(true);
+    expect(settlementCloseSchema.safeParse({ ...base, correctionSnapshotId: 3 }).success).toBe(
+      false,
+    );
+    expect(settlementCloseSchema.safeParse({ ...base, correctionRevision: 4 }).success).toBe(false);
   });
 
   test('verlangt beim Mieterwechsel die gelesene Revision', () => {

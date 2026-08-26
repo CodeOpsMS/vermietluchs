@@ -50,6 +50,7 @@ export type SettlementRow = {
   tenantShare: number;
   labor35a: number;
   allocationRounding: number;
+  /** Nur bei alten, vor der automatischen Centverteilung gespeicherten Snapshots wahr. */
   isRoundingDifference: boolean;
 };
 
@@ -80,10 +81,13 @@ export type SettlementPreview = {
   prepaymentsByGroup: Record<string, number>;
   balance: number;
   labor35a: number;
+  /** Nur zur Anzeige alter Snapshots; neue Berechnungen liefern immer 0. */
   roundingDifference: number;
   warnings: string[];
   blockingReasons: string[];
   canClose: boolean;
+  /** Fehlt nur bei alten, bereits gespeicherten Snapshots. */
+  calculationToken?: string;
   closed: boolean;
   closedAt: string | null;
   snapshotId: number | null;

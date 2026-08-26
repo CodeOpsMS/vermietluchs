@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { STATEMENT_GROUPS } from '../../shared/constants';
 import type { PageProps } from '../App';
-import { getJson, postJson } from '../api';
+import { getJson, postJson, postJsonWithRevision } from '../api';
 import { EmptyState, ErrorBox, Loading, PageHeader } from '../components/Common';
-import { activeInYear, parseGermanNumber } from '../format';
+import { activeInYear } from '../format';
 import type { SettlementPreview } from '../types';
 import SettlementArchive from './settlement/SettlementArchive';
+import SettlementActions from './settlement/SettlementActions';
 import SettlementControls from './settlement/SettlementControls';
 import SettlementNotices from './settlement/SettlementNotices';
 import SettlementPaper from './settlement/SettlementPaper';
-import type { SettlementArchiveItem, SettlementRequest } from './settlement/types';
+import type {
+  SettlementArchiveItem,
+  SettlementCloseRequest,
+  SettlementRequest,
+} from './settlement/types';
 
 export default function SettlementPage({ data, propertyId, year }: PageProps) {
   const eligibleTenancies = useMemo(
@@ -21,8 +25,6 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
   const firstEligibleId = eligibleTenancies[0]?.id ?? null;
 
   const [tenancyId, setTenancyId] = useState<number | null>(firstEligibleId);
-  const [roundingText, setRoundingText] = useState('0,00');
-  const [roundingGroup, setRoundingGroup] = useState<string>(STATEMENT_GROUPS[0]);
   const [preview, setPreview] = useState<SettlementPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,23 +32,21 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archiveBusyId, setArchiveBusyId] = useState<number | null>(null);
   const [archiveError, setArchiveError] = useState('');
+  const [correction, setCorrection] = useState<{
+    snapshotId: number;
+    revision: number;
+  } | null>(null);
 
   const pendingCostCount = data.costs.filter(
     (cost) => cost.year === year && cost.tenantStatus === 'pending',
   ).length;
-  const availableGroups = useMemo(
-    () => [
-      ...new Set<string>([
-        ...STATEMENT_GROUPS,
-        ...data.costs
-          .filter((cost) => cost.year === year)
-          .map((cost) => cost.statementGroup)
-          .filter(Boolean),
-      ]),
-    ],
-    [data.costs, year],
-  );
-
+  const selectableTenancies = useMemo(() => {
+    const selected = data.tenancies.find((tenancy) => tenancy.id === preview?.tenancyId);
+    if (!selected || eligibleTenancies.some((tenancy) => tenancy.id === selected.id)) {
+      return eligibleTenancies;
+    }
+    return [...eligibleTenancies, selected];
+  }, [data.tenancies, eligibleTenancies, preview?.tenancyId]);
   useEffect(() => {
     // Nach einem Haus-, Jahres- oder Mietvertragswechsel darf keine alte Auswahl weiterleben.
     void Promise.resolve().then(() => {
@@ -55,6 +55,7 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
         current !== null && eligibleIds.has(current) ? current : firstEligibleId,
       );
       setPreview(null);
+      setCorrection(null);
       setError('');
     });
   }, [eligibleKey, firstEligibleId, propertyId, year]);
@@ -117,6 +118,7 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
         `/api/settlements/${snapshotId}?propertyId=${propertyId}`,
       );
       setPreview(snapshot);
+      setCorrection(null);
       setError('');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (reason) {
@@ -131,23 +133,18 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
   }
 
   function requestBody(): SettlementRequest | null {
-    const roundingDifference = parseGermanNumber(roundingText);
-    const cleanGroup = roundingGroup.trim();
+    if (preview) {
+      return {
+        propertyId: preview.propertyId,
+        tenancyId: preview.tenancyId,
+        year: preview.year,
+      };
+    }
     if (!propertyId || !tenancyId) {
       setError('Bitte zuerst Haus und Mietverhältnis auswählen.');
       return null;
     }
-    if (roundingDifference === null || roundingDifference < -10 || roundingDifference > 10) {
-      setError(
-        'Die Rundungsdifferenz muss als Eurobetrag zwischen −10,00 € und 10,00 € angegeben werden.',
-      );
-      return null;
-    }
-    if (!cleanGroup || cleanGroup.length > 100) {
-      setError('Bitte eine Rundungsgruppe mit höchstens 100 Zeichen angeben.');
-      return null;
-    }
-    return { propertyId, tenancyId, year, roundingDifference, roundingGroup: cleanGroup };
+    return { propertyId, tenancyId, year };
   }
 
   async function createPreview() {
@@ -156,7 +153,14 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
     setLoading(true);
     setError('');
     try {
-      setPreview(await postJson<SettlementPreview>('/api/settlements/preview', body));
+      const calculated = correction
+        ? await postJsonWithRevision<SettlementPreview>(
+            `/api/settlements/${correction.snapshotId}/correction?propertyId=${body.propertyId}`,
+            {},
+            correction.revision,
+          )
+        : await postJson<SettlementPreview>('/api/settlements/preview', body);
+      setPreview(calculated);
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : 'Abrechnung konnte nicht berechnet werden.',
@@ -167,8 +171,23 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
   }
 
   async function closeSettlement() {
-    const body = requestBody();
-    if (!body || !preview || preview.closed || !preview.canClose) return;
+    if (!preview || preview.closed || !preview.canClose) return;
+    if (!preview.calculationToken) {
+      setError('Diese Vorschau ist veraltet. Bitte berechne sie vor dem Abschluss noch einmal.');
+      return;
+    }
+    const body: SettlementCloseRequest = {
+      propertyId: preview.propertyId,
+      tenancyId: preview.tenancyId,
+      year: preview.year,
+      expectedCalculationToken: preview.calculationToken,
+      ...(correction
+        ? {
+            correctionSnapshotId: correction.snapshotId,
+            correctionRevision: correction.revision,
+          }
+        : {}),
+    };
     if (
       !window.confirm(
         `Abrechnung ${preview.year} für ${preview.tenantName} verbindlich abschließen? Der berechnete Stand wird unveränderlich gespeichert.`,
@@ -182,6 +201,7 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
     try {
       const closed = await postJson<SettlementPreview>('/api/settlements/close', body);
       setPreview(closed);
+      setCorrection(null);
       if (propertyId) await refreshArchive(propertyId);
     } catch (reason) {
       setError(
@@ -192,60 +212,83 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
     }
   }
 
+  async function correctSettlement() {
+    if (!preview?.closed || !preview.snapshotId) return;
+    const archiveItem = archive.find((item) => item.snapshotId === preview.snapshotId);
+    if (!archiveItem) {
+      setError('Der Archivstand ist noch nicht geladen. Bitte versuche es gleich erneut.');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Abrechnung ${preview.year} für ${preview.tenantName} zur Korrektur öffnen?\n\nDie App berechnet eine neue Vorschau aus den aktuellen Kosten, Zahlungen und Vermieterdaten. Der bisherige Abschluss bleibt erhalten, bis du die Korrektur erneut abschließt. Vorher kannst du unter Einstellungen ein JSON-Backup herunterladen.`,
+      )
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    setArchiveBusyId(preview.snapshotId);
+    setError('');
+    try {
+      const corrected = await postJsonWithRevision<SettlementPreview>(
+        `/api/settlements/${preview.snapshotId}/correction?propertyId=${preview.propertyId}`,
+        {},
+        archiveItem.revision,
+      );
+      setTenancyId(corrected.tenancyId);
+      setPreview(corrected);
+      setCorrection({ snapshotId: archiveItem.snapshotId, revision: archiveItem.revision });
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Die Abrechnung konnte nicht zur Korrektur geöffnet werden.',
+      );
+    } finally {
+      setLoading(false);
+      setArchiveBusyId(null);
+    }
+  }
+
   function changeTenancy(nextTenancyId: number | null) {
     setTenancyId(nextTenancyId);
     setPreview(null);
+    setCorrection(null);
     setError('');
-  }
-
-  function changeRoundingText(value: string) {
-    setRoundingText(value);
-    setPreview(null);
-  }
-
-  function changeRoundingGroup(value: string) {
-    setRoundingGroup(value);
-    setPreview(null);
   }
 
   return (
     <>
       <PageHeader
-        title={`Abrechnung ${preview?.closed ? preview.year : year}`}
+        title={`Abrechnung ${preview?.year ?? year}`}
         subtitle="Die Vorauszahlungen stammen aus dem tatsächlichen Mietkonto. Erst prüfen, dann den Stand unveränderlich abschließen."
         actions={
           preview ? (
-            <>
-              <button className="btn btn-secondary" type="button" onClick={() => window.print()}>
-                Drucken / PDF
-              </button>
-              <button
-                className="btn btn-primary"
-                type="button"
-                disabled={preview.closed || !preview.canClose || loading}
-                onClick={() => void closeSettlement()}
-              >
-                {preview.closed ? 'Abgeschlossen' : 'Abrechnung abschließen'}
-              </button>
-            </>
+            <SettlementActions
+              preview={preview}
+              busy={loading || archiveBusyId !== null}
+              onPrint={() => window.print()}
+              onCorrect={() => void correctSettlement()}
+              onClose={() => void closeSettlement()}
+            />
           ) : undefined
         }
       />
 
       {error && <ErrorBox message={error} />}
-      <SettlementNotices pendingCostCount={pendingCostCount} preview={preview} />
+      <SettlementNotices
+        pendingCostCount={pendingCostCount}
+        preview={preview}
+        isCorrection={correction !== null}
+      />
       <SettlementControls
-        eligibleTenancies={eligibleTenancies}
+        eligibleTenancies={selectableTenancies}
         units={data.units}
         tenancyId={tenancyId}
-        roundingText={roundingText}
-        roundingGroup={roundingGroup}
-        availableGroups={availableGroups}
         loading={loading}
         hasPreview={preview !== null}
         onTenancyChange={changeTenancy}
-        onRoundingTextChange={changeRoundingText}
-        onRoundingGroupChange={changeRoundingGroup}
         onCreatePreview={() => void createPreview()}
       />
 
@@ -282,8 +325,7 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
             </button>
           }
         >
-          Prüfe anschließend Kostenpositionen, tatsächliche Vorauszahlungen, Rundungsdifferenz und
-          Saldo.
+          Prüfe anschließend Kostenpositionen, tatsächliche Vorauszahlungen und Saldo.
         </EmptyState>
       )}
 

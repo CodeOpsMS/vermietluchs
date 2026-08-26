@@ -21,9 +21,9 @@ export function calculatePrepayments(tenancy: SettlementTenancy, year: number): 
   if (tenancy.prepaymentOverridesByGroupCents !== undefined) {
     for (const [group, value] of Object.entries(tenancy.prepaymentOverridesByGroupCents)) {
       const cents = value ?? 0;
-      if (!Number.isInteger(cents) || cents < 0) {
+      if (!Number.isSafeInteger(cents) || cents < 0) {
         throw new TypeError(
-          `Die tatsächliche Vorauszahlung für ${group} muss ein nichtnegativer Centbetrag sein.`,
+          `Die tatsächliche Vorauszahlung für ${group} muss ein nichtnegativer sicherer Centbetrag sein.`,
         );
       }
       byGroup[group] = cents;
@@ -36,8 +36,13 @@ export function calculatePrepayments(tenancy: SettlementTenancy, year: number): 
   }
 
   if (tenancy.prepaymentOverrideCents !== undefined) {
-    if (!Number.isInteger(tenancy.prepaymentOverrideCents) || tenancy.prepaymentOverrideCents < 0) {
-      throw new TypeError('Die korrigierte Vorauszahlung muss ein nichtnegativer Centbetrag sein.');
+    if (
+      !Number.isSafeInteger(tenancy.prepaymentOverrideCents) ||
+      tenancy.prepaymentOverrideCents < 0
+    ) {
+      throw new TypeError(
+        'Die korrigierte Vorauszahlung muss ein nichtnegativer sicherer Centbetrag sein.',
+      );
     }
     byGroup.Wohnung = tenancy.prepaymentOverrideCents;
     return {
@@ -55,8 +60,8 @@ export function calculatePrepayments(tenancy: SettlementTenancy, year: number): 
     if (!/^\d{4}-\d{2}$/.test(level.fromMonth)) {
       throw new TypeError(`Ungültiger Vorauszahlungsmonat „${level.fromMonth}“.`);
     }
-    if (!Number.isInteger(level.monthlyCents) || level.monthlyCents < 0) {
-      throw new TypeError('Vorauszahlungen müssen nichtnegative ganze Cent sein.');
+    if (!Number.isSafeInteger(level.monthlyCents) || level.monthlyCents < 0) {
+      throw new TypeError('Vorauszahlungen müssen nichtnegative sichere ganze Cent sein.');
     }
     const group = level.group ?? 'Wohnung';
     if (!groups.includes(group)) {

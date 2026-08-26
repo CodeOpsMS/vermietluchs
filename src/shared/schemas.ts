@@ -210,13 +210,32 @@ export const paymentInputSchema = z
     }
   });
 
-export const settlementCreateSchema = z.object({
-  propertyId: idSchema,
-  tenancyId: idSchema,
-  year: yearSchema,
-  roundingDifference: z.number().finite().min(-10).max(10).default(0),
-  roundingGroup: z.string().trim().min(1).max(100).default('Wohnung'),
-});
+export const settlementCreateSchema = z
+  .object({
+    propertyId: idSchema,
+    tenancyId: idSchema,
+    year: yearSchema,
+  })
+  .strict();
+
+export const settlementCloseSchema = z
+  .object({
+    propertyId: idSchema,
+    tenancyId: idSchema,
+    year: yearSchema,
+    expectedCalculationToken: z.string().regex(/^[a-f0-9]{64}$/),
+    correctionSnapshotId: idSchema.optional(),
+    correctionRevision: revisionSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.correctionSnapshotId === undefined) !== (value.correctionRevision === undefined)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Snapshot-ID und Revision müssen für eine Korrektur gemeinsam angegeben werden.',
+      });
+    }
+  });
 
 export const backupSchema = z.object({
   schemaVersion: z.literal(BACKUP_SCHEMA_VERSION),

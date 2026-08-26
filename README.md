@@ -82,7 +82,11 @@ Der Befehl prüft TypeScript, Stilregeln, Fachtests und den Produktions-Build.
    speichern.
 
 Ein Abschluss speichert eine unveränderliche Momentaufnahme. Spätere Änderungen
-an Stammdaten verändern eine bereits abgeschlossene Abrechnung nicht.
+an Stammdaten verändern eine bereits abgeschlossene Abrechnung nicht. Über
+„Zur Korrektur öffnen“ kann ein neuer Stand mit den aktuellen Daten berechnet
+werden. Der alte Stand bleibt bis zum erneuten, atomaren Abschluss erhalten.
+Eine Prüfsumme verhindert, dass zwischen Vorschau und Abschluss unbemerkt
+geänderte Daten gespeichert werden.
 
 ## Ordnerstruktur
 
