@@ -63,7 +63,7 @@ export default function CostsPage({ data, propertyId, year, reload }: PageProps)
       return setError('Bitte interne Bezeichnung und Originalbetrag prüfen.');
     }
     if (!form.statementGroup.trim() || form.statementGroup.trim().length > 100) {
-      return setError('Bitte eine Abrechnungsgruppe mit höchstens 100 Zeichen angeben.');
+      return setError('Bitte eine Sammelposition mit höchstens 100 Zeichen angeben.');
     }
     if (allocableAmount === null || allocableAmount < 0 || allocableAmount > sourceAmount) {
       return setError('Der umlagefähige Betrag muss zwischen 0 und Originalbetrag liegen.');
@@ -121,7 +121,7 @@ export default function CostsPage({ data, propertyId, year, reload }: PageProps)
     <>
       <PageHeader
         title={`Kosten ${year}`}
-        subtitle="Originalbetrag intern dokumentieren, Umlagefähigkeit entscheiden und nur den richtigen Anteil nach außen geben."
+        subtitle="Einzelkosten intern dokumentieren, Umlagefähigkeit entscheiden und für den Mieter zu übersichtlichen Sammelpositionen bündeln."
         actions={
           <button
             className="btn btn-primary"

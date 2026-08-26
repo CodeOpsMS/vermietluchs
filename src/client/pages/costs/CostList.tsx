@@ -1,7 +1,13 @@
 import { ConfirmButton, EmptyState, StatusPill } from '../../components/Common';
 import { euro } from '../../format';
 import type { Cost, Tenancy, Unit } from '../../types';
-import { KEY_LABEL, METER_LABEL, STATUS_LABEL, type CostView } from './cost-model';
+import {
+  createExternalCostGroups,
+  KEY_LABEL,
+  METER_LABEL,
+  STATUS_LABEL,
+  type CostView,
+} from './cost-model';
 
 type CostListProps = {
   view: CostView;
@@ -24,14 +30,12 @@ export function CostList({
   onEdit,
   onDelete,
 }: CostListProps) {
-  const includedCount = costs.filter((cost) => cost.tenantStatus === 'included').length;
   const pendingCount = costs.filter((cost) => cost.tenantStatus === 'pending').length;
+  const externalGroups = createExternalCostGroups(costs);
   const shownCosts =
-    view === 'internal'
-      ? costs
-      : view === 'external'
-        ? costs.filter((cost) => cost.tenantStatus === 'included')
-        : costs.filter((cost) => cost.tenantStatus === 'pending');
+    view === 'pending' ? costs.filter((cost) => cost.tenantStatus === 'pending') : costs;
+  const shownCount = view === 'external' ? externalGroups.length : shownCosts.length;
+  const externalTotal = externalGroups.reduce((sum, group) => sum + group.allocableAmount, 0);
 
   return (
     <section className="card">
@@ -46,7 +50,7 @@ export function CostList({
           className={view === 'external' ? 'active' : ''}
           onClick={() => onViewChange('external')}
         >
-          Extern · Mieter <span>{includedCount}</span>
+          Extern · Mieter <span>{externalGroups.length}</span>
         </button>
         <button
           className={view === 'pending' ? 'active' : ''}
@@ -56,7 +60,7 @@ export function CostList({
         </button>
       </div>
 
-      {shownCosts.length === 0 && (
+      {shownCount === 0 && (
         <EmptyState
           title={view === 'pending' ? 'Keine offenen Prüffälle' : 'Noch keine Kosten'}
           action={
@@ -68,19 +72,56 @@ export function CostList({
           }
         >
           {view === 'external'
-            ? 'Freigegebene Kosten erscheinen hier und später in der Mieterabrechnung.'
+            ? 'Hier erscheinen die für den Mieter vorgesehenen Sammelpositionen.'
             : 'Für dieses Jahr gibt es in dieser Sicht nichts zu zeigen.'}
         </EmptyState>
       )}
 
-      {shownCosts.length > 0 && (
+      {view === 'external' && externalGroups.length > 0 && (
+        <div className="table-wrap">
+          <table className="data-table cost-table">
+            <thead>
+              <tr>
+                <th>Sammelposition</th>
+                <th className="number-cell">Umlagefähig</th>
+              </tr>
+            </thead>
+            <tbody>
+              {externalGroups.map((group) => (
+                <tr key={group.name}>
+                  <td>
+                    <strong>{group.name}</strong>
+                    <small>
+                      {group.costCount} interne Position
+                      {group.costCount === 1 ? '' : 'en'} zusammengefasst
+                    </small>
+                  </td>
+                  <td className="number-cell">
+                    <strong>{euro(group.allocableAmount)}</strong>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Gesamt</td>
+                <td className="number-cell">
+                  <strong>{euro(externalTotal)}</strong>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {view !== 'external' && shownCosts.length > 0 && (
         <div className="table-wrap">
           <table className="data-table cost-table">
             <thead>
               <tr>
                 <th>Position</th>
                 <th>Status</th>
-                <th>Gruppe &amp; Verteilung</th>
+                <th>Sammelposition &amp; Verteilung</th>
                 {view === 'internal' && <th className="number-cell">Original</th>}
                 <th className="number-cell">Umlagefähig</th>
                 <th className="actions-cell no-print">Aktion</th>
@@ -93,14 +134,7 @@ export function CostList({
                 return (
                   <tr key={cost.id}>
                     <td>
-                      <strong>
-                        {view === 'external' && cost.descriptionTenant
-                          ? cost.descriptionTenant
-                          : cost.descriptionInternal}
-                      </strong>
-                      {view === 'internal' && cost.descriptionTenant && (
-                        <small>Mietertext: {cost.descriptionTenant}</small>
-                      )}
+                      <strong>{cost.descriptionInternal}</strong>
                       {cost.notes && <small>{cost.notes}</small>}
                     </td>
                     <td>

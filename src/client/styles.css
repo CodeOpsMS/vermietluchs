@@ -1334,6 +1334,13 @@ legend {
 .statement-group table {
   font-size: 0.78rem;
 }
+.statement-group td > strong,
+.statement-group td > small {
+  display: block;
+}
+.statement-group td > small {
+  margin-top: 3px;
+}
 .statement-group tfoot {
   font-weight: 850;
   background: var(--surface-muted);

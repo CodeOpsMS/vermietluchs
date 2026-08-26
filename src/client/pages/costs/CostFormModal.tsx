@@ -51,15 +51,6 @@ export function CostFormModal({
           />
           <small>Nur intern sichtbar; darf genau und technisch sein.</small>
         </label>
-        <label className="field span-2">
-          Bezeichnung für den Mieter
-          <input
-            value={form.descriptionTenant}
-            onChange={(event) => onChange({ ...form, descriptionTenant: event.target.value })}
-            placeholder="z. B. Heizkosten"
-          />
-          <small>Leer lassen, um die interne Bezeichnung zu verwenden.</small>
-        </label>
         <label className="field">
           Originalbetrag
           <input
@@ -87,7 +78,7 @@ export function CostFormModal({
           />
         </label>
         <label className="field">
-          Mieterstatus
+          Umlagefähigkeit
           <select
             value={form.tenantStatus}
             onChange={(event) =>
@@ -97,13 +88,14 @@ export function CostFormModal({
               })
             }
           >
-            <option value="included">Umlagefähig</option>
-            <option value="excluded">Nicht umlagefähig</option>
-            <option value="pending">Prüfung offen</option>
+            <option value="included">Ja – umlagefähig</option>
+            <option value="excluded">Nein – nicht umlagefähig</option>
+            <option value="pending">Noch zu prüfen</option>
           </select>
+          <small>Diese Entscheidung ist unabhängig von der externen Sammelposition.</small>
         </label>
         <label className="field">
-          Abrechnungsgruppe
+          Sammelposition für den Mieter
           <input
             list="cost-statement-groups"
             maxLength={100}
@@ -116,7 +108,9 @@ export function CostFormModal({
               <option key={group} value={group} />
             ))}
           </datalist>
-          <small>Vorschlag wählen oder eigene Gruppe eingeben, z. B. „Aufzug“.</small>
+          <small>
+            Gleicher Name ergibt extern eine Summe, z. B. Wasser, Müll und Strom unter „Wohnung“.
+          </small>
         </label>
         <label className="field">
           Berechnungsmodus

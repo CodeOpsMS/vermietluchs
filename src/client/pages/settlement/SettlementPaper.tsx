@@ -1,5 +1,6 @@
 import { dateDe, euro } from '../../format';
 import type { SettlementPreview } from '../../types';
+import { createTenantStatementGroups } from './settlement-groups';
 
 type SettlementPaperProps = {
   preview: SettlementPreview;
@@ -9,16 +10,6 @@ function prepaymentLabel(group: string): string {
   if (group === 'Wohnung') return 'Nebenkosten Wohnung';
   if (group === 'Garage') return 'Garage';
   return group;
-}
-
-function groupRows(preview: SettlementPreview) {
-  const groups = new Map<string, SettlementPreview['rows']>();
-  for (const row of preview.rows) {
-    const rows = groups.get(row.statementGroup) ?? [];
-    rows.push(row);
-    groups.set(row.statementGroup, rows);
-  }
-  return [...groups.entries()];
 }
 
 function getPrepaymentEntries(preview: SettlementPreview): Array<[string, number]> {
@@ -33,7 +24,7 @@ function getPrepaymentEntries(preview: SettlementPreview): Array<[string, number
 }
 
 export default function SettlementPaper({ preview }: SettlementPaperProps) {
-  const groups = groupRows(preview);
+  const groups = createTenantStatementGroups(preview.rows);
   const prepaymentEntries = getPrepaymentEntries(preview);
 
   return (
@@ -103,47 +94,55 @@ export default function SettlementPaper({ preview }: SettlementPaperProps) {
         </div>
       )}
 
-      {groups.map(([group, rows]) => (
-        <section className="statement-group" key={group}>
-          <h3>{group}</h3>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Kostenart</th>
-                  <th>Verteilung</th>
-                  <th className="number-cell">Original</th>
-                  <th className="number-cell">Umlagefähig</th>
-                  <th className="number-cell">Ihr Anteil</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => (
-                  <tr key={row.id ?? `${group}-${index}`}>
-                    <td>
-                      <strong>{row.description}</strong>
-                    </td>
-                    <td>{row.allocationLabel}</td>
-                    <td className="number-cell">{euro(row.sourceAmount)}</td>
-                    <td className="number-cell">{euro(row.allocableAmount)}</td>
-                    <td className="number-cell">
-                      <strong>{euro(row.tenantShare)}</strong>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={4}>Summe {group}</td>
+      <section className="statement-group">
+        <h3>Umlagefähige Betriebskosten</h3>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Sammelposition</th>
+                <th className="number-cell">Original gesamt</th>
+                <th className="number-cell">Umlagefähig</th>
+                <th className="number-cell">Ihr Anteil</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((group) => (
+                <tr key={group.name}>
+                  <td>
+                    <strong>{group.name}</strong>
+                    {group.allocationLabels.length > 0 && (
+                      <small>
+                        {group.isLegacyRounding ? 'Altdaten: ' : 'Verteilung: '}
+                        {group.allocationLabels.join(' · ')}
+                      </small>
+                    )}
+                  </td>
+                  <td className="number-cell">{euro(group.sourceAmount)}</td>
+                  <td className="number-cell">{euro(group.allocableAmount)}</td>
                   <td className="number-cell">
-                    {euro(rows.reduce((sum, row) => sum + row.tenantShare, 0))}
+                    <strong>{euro(group.tenantShare)}</strong>
                   </td>
                 </tr>
-              </tfoot>
-            </table>
-          </div>
-        </section>
-      ))}
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Gesamt</td>
+                <td className="number-cell">
+                  {euro(groups.reduce((sum, group) => sum + group.sourceAmount, 0))}
+                </td>
+                <td className="number-cell">
+                  {euro(groups.reduce((sum, group) => sum + group.allocableAmount, 0))}
+                </td>
+                <td className="number-cell">
+                  <strong>{euro(preview.totalTenantShare)}</strong>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
 
       <section className="prepayment-explanation">
         <h3>Tatsächlich geleistete Betriebskostenvorauszahlungen</h3>

@@ -156,7 +156,7 @@ export default function CockpitPage({
           <h2>Eine Wahrheit, zwei Ansichten</h2>
           <p>
             Intern bleiben Originalkosten und Prüffälle sichtbar. In der Mieterabrechnung erscheinen
-            nur freigegebene, umlagefähige Beträge.
+            nur freigegebene, umlagefähige Beträge – gebündelt nach Sammelposition.
           </p>
           <div className="comparison-bars">
             <div>

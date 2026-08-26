@@ -17,7 +17,7 @@ Jahren Programmiererfahrung gut nachvollziehbar bleibt.
 - Mieterwechsel mit optionalen Zwischenablesungen erfassen
 - interne Kosten und umlagefähige Mieterkosten getrennt pflegen
 - Kosten nach Fläche, Personen, Einheiten, Verbrauch oder direkt verteilen
-- eigene Abrechnungsgruppen zusätzlich zu Wohnung, Garage und Grundsteuer nutzen
+- interne Einzelkosten in Mieter-Sammelpositionen wie Wohnung, Garage und Grundsteuer bündeln
 - einen bereits feststehenden Mieteranteil ohne erneute Zeitaufteilung erfassen
 - Zählerstände und bei Bedarf nachvollziehbare Interpolationen verwenden
 - Soll- und Ist-Zahlungen getrennt nach Kaltmiete, Nebenkosten und Garage führen

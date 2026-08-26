@@ -1,4 +1,5 @@
 import { FieldError, FormActions, Modal, SaveForm } from '../../components/Common';
+import { GermanDateInput } from '../../components/GermanDateInput';
 import type { TenancyForm } from './formModels';
 
 type TenancyFormModalProps = {
@@ -54,19 +55,17 @@ export default function TenancyFormModal({
         </label>
         <label className="field">
           Mietbeginn
-          <input
-            type="date"
+          <GermanDateInput
             value={form.startDate}
-            onChange={(event) => onChange({ ...form, startDate: event.target.value })}
+            onChange={(startDate) => onChange({ ...form, startDate })}
             required
           />
         </label>
         <label className="field">
           Mietende (optional)
-          <input
-            type="date"
+          <GermanDateInput
             value={form.endDate}
-            onChange={(event) => onChange({ ...form, endDate: event.target.value })}
+            onChange={(endDate) => onChange({ ...form, endDate })}
           />
         </label>
         <label className="field">

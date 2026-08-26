@@ -18,9 +18,11 @@ export default function SettlementActions({
   if (preview.closed) {
     return (
       <>
-        <button className="btn btn-secondary" type="button" onClick={onPrint}>
-          Drucken / PDF
-        </button>
+        {preview.roundingDifference === 0 && (
+          <button className="btn btn-secondary" type="button" onClick={onPrint}>
+            Drucken / PDF
+          </button>
+        )}
         <button className="btn btn-secondary" type="button" disabled={busy} onClick={onCorrect}>
           Zur Korrektur öffnen
         </button>
