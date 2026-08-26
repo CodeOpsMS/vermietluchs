@@ -265,7 +265,7 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await dialog.getByLabel('Name', { exact: true }).fill('E2E Testmieter geändert');
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
-    await testUnit.locator('summary').filter({ hasText: 'Mietverlauf (1)' }).click();
+    await expect(testUnit.locator('details')).toHaveAttribute('open', '');
     await testUnit.getByRole('button', { name: 'Mieterwechsel', exact: true }).click();
     await expect(
       page.getByRole('dialog', { name: 'Mieterwechsel · E2E Testwohnung' }),
