@@ -146,6 +146,7 @@ async function dismissDialogAfter(page: Page, action: () => Promise<void>): Prom
 
 test.describe.serial('Vermietluchs-Oberfläche', () => {
   test('bedient Buttons und zeigt die centgenauen Zahlen', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-08-26T08:00:00.000Z'));
     await seedApplication(page.request);
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -186,10 +187,7 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
       .first()
       .click();
     await expect(page.getByRole('heading', { level: 1, name: 'Kosten 2024' })).toBeVisible();
-    await page
-      .getByRole('button', { name: /Vermietluchs/ })
-      .first()
-      .click();
+    await page.locator('.brand').click();
     await expect(page.getByRole('heading', { level: 1, name: 'Cockpit 2024' })).toBeVisible();
 
     await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
@@ -203,14 +201,15 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     );
     const chooserPromise = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: 'Backup einspielen' }).click();
-    await chooserPromise;
+    const chooser = await chooserPromise;
+    await chooser.setFiles([]);
 
     await navigate(page, 'Stammdaten', 'Häuser & Wohnungen');
     await page.getByRole('button', { name: '+ Haus anlegen' }).click();
     let dialog = page.getByRole('dialog', { name: 'Haus anlegen' });
     await expect(dialog.getByLabel('Bezeichnung')).toBeFocused();
     await dialog.getByLabel('Bezeichnung').fill('E2E Testhaus');
-    await dialog.getByLabel('Anschrift').fill('Testweg 1, 12345 Teststadt');
+    await dialog.getByLabel('Anschrift', { exact: true }).fill('Testweg 1, 12345 Teststadt');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     await expect(
       page.locator('.property-strip').getByText('E2E Testhaus', { exact: true }),
@@ -219,8 +218,9 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     dialog = page.getByRole('dialog', { name: 'Haus bearbeiten' });
     await dialog.getByLabel('Bezeichnung').fill('E2E Testhaus geändert');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
-    await page.getByLabel('Haus auswählen').selectOption({ label: 'E2E Testhaus geändert' });
-    await expect(page.getByLabel('Haus auswählen')).toHaveValue('2');
+    const propertySelect = page.getByLabel('Haus auswählen');
+    await propertySelect.selectOption({ label: 'E2E Testhaus geändert' });
+    await expect(propertySelect.locator('option:checked')).toHaveText('E2E Testhaus geändert');
     await page.getByLabel('Haus auswählen').selectOption({ label: 'Demohaus' });
     const deleteTestProperty = page.getByRole('button', {
       name: /Haus „E2E Testhaus geändert“.*löschen/,
@@ -257,13 +257,13 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await dialog.getByLabel('Zahlungstag').fill('3');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
-    await testUnit.getByText('Mietverlauf (1)').click();
+    await testUnit.locator('summary').filter({ hasText: 'Mietverlauf (1)' }).click();
     await testUnit.getByRole('button', { name: 'Bearbeiten' }).click();
     dialog = page.getByRole('dialog', { name: 'Mietverhältnis bearbeiten' });
     await dialog.getByLabel('Name', { exact: true }).fill('E2E Testmieter geändert');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
-    await testUnit.getByText('Mietverlauf (1)').click();
+    await testUnit.locator('summary').filter({ hasText: 'Mietverlauf (1)' }).click();
     await testUnit.getByRole('button', { name: 'Mieterwechsel' }).click();
     await expect(
       page.getByRole('dialog', { name: 'Mieterwechsel · E2E Testwohnung' }),
@@ -285,7 +285,10 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(page.locator('.meter-card').filter({ hasText: 'Kaltwasser Bad' })).toContainText(
       /70\s*m³/,
     );
-    await page.getByRole('button', { name: '+ Zähler', exact: true }).first().click();
+    await page
+      .locator('.page-actions')
+      .getByRole('button', { name: '+ Zähler', exact: true })
+      .click();
     dialog = page.getByRole('dialog', { name: 'Zähler anlegen' });
     await dialog.getByLabel('Bezeichnung').fill('E2E Prüfzähler');
     await dialog.getByLabel('Zählernummer').fill('E2E-1');
@@ -298,7 +301,11 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     testMeter = page.locator('.meter-card').filter({ hasText: 'E2E Prüfzähler geändert' });
     await acceptDialogAfter(page, () =>
-      testMeter.getByRole('button', { name: /Zähler .* löschen/ }).click(),
+      testMeter
+        .getByRole('button', {
+          name: 'Zähler „E2E Prüfzähler geändert“ samt Ablesungen löschen?',
+        })
+        .click(),
     );
     await expect(testMeter).toHaveCount(0);
     const waterMeter = page.locator('.meter-card').filter({ hasText: 'Kaltwasser Bad' });
@@ -341,7 +348,9 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(page.getByRole('button', { name: /Extern · Mieter/ })).toHaveClass(/active/);
     await expect(page.locator('.cost-table tbody')).toContainText('Wohnung');
     await page.getByRole('button', { name: /Prüfung offen/ }).click();
-    await expect(page.getByText('Keine offenen Prüffälle')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 3, name: 'Keine offenen Prüffälle' }),
+    ).toBeVisible();
     await page.getByRole('button', { name: /Intern · alle/ }).click();
 
     await navigate(page, 'Mietkonto', 'Mietkonto 2024');
@@ -397,7 +406,10 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(page.getByText('Diese Abrechnung ist abgeschlossen.')).toBeVisible();
     await navigate(page, 'Cockpit', 'Cockpit 2024');
     await navigate(page, 'Abrechnung', 'Abrechnung 2024');
-    await page.getByRole('button', { name: 'Öffnen', exact: true }).click();
+    const archiveItem = page.locator('.archive-list > div').filter({
+      hasText: '2024 · Demo Mieter Januar–Juli',
+    });
+    await archiveItem.getByRole('button', { name: 'Öffnen', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Geöffnet' })).toBeVisible();
     await expect(page.locator('.settlement-paper')).toContainText(/119,69\s*€/);
     await expect(pageErrors).toEqual([]);
@@ -419,6 +431,10 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await menuButton.click();
     await page.getByRole('button', { name: 'Menü schließen' }).click();
     await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
   });
 });
