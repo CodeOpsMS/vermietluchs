@@ -334,9 +334,17 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await navigate(page, 'Kosten', 'Kosten 2024');
     await page.getByRole('button', { name: '+ Kostenposition', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Kostenposition erfassen' });
-    await dialog.getByLabel(/^Interne Bezeichnung/).fill('E2E temporäre Kosten');
+    await dialog
+      .locator('label')
+      .filter({ hasText: /^Interne Bezeichnung/ })
+      .locator('input')
+      .fill('E2E temporäre Kosten');
     await dialog.getByLabel('Originalbetrag', { exact: true }).fill('10');
-    await dialog.getByLabel('Mieterstatus', { exact: true }).selectOption('excluded');
+    await dialog
+      .locator('label')
+      .filter({ hasText: /^Mieterstatus/ })
+      .locator('select')
+      .selectOption('excluded');
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await page
       .getByRole('button', {
@@ -345,7 +353,11 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
       })
       .click();
     dialog = page.getByRole('dialog', { name: 'Kostenposition bearbeiten' });
-    await dialog.getByLabel(/^Interne Bezeichnung/).fill('E2E temporäre Kosten geändert');
+    await dialog
+      .locator('label')
+      .filter({ hasText: /^Interne Bezeichnung/ })
+      .locator('input')
+      .fill('E2E temporäre Kosten geändert');
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await acceptDialogAfter(page, () =>
       page
@@ -381,7 +393,12 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
       .getByRole('button', { name: 'Buchung vom 03.01.2024 bearbeiten', exact: true })
       .click();
     dialog = page.getByRole('dialog', { name: 'Buchung bearbeiten' });
-    await expect(dialog.getByLabel(/^Zahlung gesamt/)).toHaveValue(/850,00\s*€/);
+    await expect(
+      dialog
+        .locator('label')
+        .filter({ hasText: /^Zahlung gesamt/ })
+        .locator('input'),
+    ).toHaveValue(/850,00\s*€/);
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page.locator('.ledger-table tbody tr')).toHaveCount(7);
 
