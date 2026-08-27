@@ -1,4 +1,5 @@
 import { FieldError, FormActions, Modal, SaveForm } from '../../components/Common';
+import { GermanDateInput } from '../../components/GermanDateInput';
 import { euro } from '../../format';
 import type { Tenancy, Unit } from '../../types';
 import type { PaymentForm } from './paymentModel';
@@ -48,19 +49,17 @@ export default function PaymentModal({
         </label>
         <label className="field">
           Fälligkeit
-          <input
-            type="date"
+          <GermanDateInput
             value={form.dueDate}
-            onChange={(event) => onChange({ ...form, dueDate: event.target.value })}
+            onChange={(dueDate) => onChange({ ...form, dueDate })}
             required
           />
         </label>
         <label className="field">
           Zahlungseingang
-          <input
-            type="date"
+          <GermanDateInput
             value={form.paidDate}
-            onChange={(event) => onChange({ ...form, paidDate: event.target.value })}
+            onChange={(paidDate) => onChange({ ...form, paidDate })}
           />
         </label>
 

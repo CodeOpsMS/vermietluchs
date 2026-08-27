@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import SettlementActions from '../src/client/pages/settlement/SettlementActions';
+import { createTenantStatementGroups } from '../src/client/pages/settlement/settlement-groups';
 import SettlementPaper from '../src/client/pages/settlement/SettlementPaper';
 import type { SettlementPreview } from '../src/client/types';
 
@@ -26,14 +27,26 @@ const preview: SettlementPreview = {
   rows: [
     {
       id: 1,
-      description: 'Wohnung',
+      description: 'Interne Wasserrechnung',
       statementGroup: 'Wohnung',
       allocationLabel: 'Fester Mieteranteil',
-      sourceAmount: 1102.7,
-      allocableAmount: 1102.7,
-      tenantShare: 1102.7,
+      sourceAmount: 600,
+      allocableAmount: 600,
+      tenantShare: 600,
       labor35a: 0,
       allocationRounding: 0.01,
+      isRoundingDifference: false,
+    },
+    {
+      id: 2,
+      description: 'Interne Müllrechnung',
+      statementGroup: 'Wohnung',
+      allocationLabel: '47,46 von 100,00 m² Wohnfläche',
+      sourceAmount: 600.7,
+      allocableAmount: 502.7,
+      tenantShare: 502.7,
+      labor35a: 0,
+      allocationRounding: 0,
       isRoundingDifference: false,
     },
   ],
@@ -71,6 +84,32 @@ describe('Schlichte Abrechnungs-Druckansicht', () => {
     expect(html).not.toContain('Rundung');
   });
 
+  test('fasst interne Einzelkosten zu genau einer Mieterposition zusammen', () => {
+    const groups = createTenantStatementGroups(preview.rows);
+    const html = renderToStaticMarkup(<SettlementPaper preview={preview} />);
+
+    expect(groups).toEqual([
+      {
+        name: 'Wohnung',
+        sourceAmount: 1200.7,
+        allocableAmount: 1102.7,
+        tenantShare: 1102.7,
+        allocationLabels: ['Fester Mieteranteil', '47,46 von 100,00 m² Wohnfläche'],
+        isLegacyRounding: false,
+      },
+    ]);
+    expect(groups.reduce((sum, group) => sum + group.tenantShare, 0)).toBe(
+      preview.totalTenantShare,
+    );
+    expect(html).toContain('Sammelposition');
+    expect(html).toContain('Verteilung:');
+    expect(html).toContain('Fester Mieteranteil');
+    expect(html).toContain('47,46 von 100,00 m² Wohnfläche');
+    expect(html).toContain('Gesamt');
+    expect(html).not.toContain('Interne Wasserrechnung');
+    expect(html).not.toContain('Interne Müllrechnung');
+  });
+
   test('bietet den PDF-Druck nur für einen abgeschlossenen Stand an', () => {
     const callbacks = {
       onPrint: () => undefined,
@@ -92,5 +131,47 @@ describe('Schlichte Abrechnungs-Druckansicht', () => {
     expect(closedActions).toContain('Zur Korrektur öffnen');
     expect(openActions).not.toContain('Drucken / PDF');
     expect(openActions).toContain('Abrechnung abschließen');
+  });
+
+  test('macht einen alten Excel-Ausgleich sichtbar und sperrt dessen PDF-Druck', () => {
+    const legacyPreview: SettlementPreview = {
+      ...preview,
+      rows: [
+        ...preview.rows,
+        {
+          id: null,
+          description: 'Rundungsdifferenz',
+          statementGroup: 'Wohnung',
+          allocationLabel: 'Alter Excel-Ausgleich',
+          sourceAmount: 0,
+          allocableAmount: 0,
+          tenantShare: 0.01,
+          labor35a: 0,
+          allocationRounding: 0,
+          isRoundingDifference: true,
+        },
+      ],
+      totalTenantShare: 1102.71,
+      balance: 52.71,
+      roundingDifference: 0.01,
+    };
+    const groups = createTenantStatementGroups(legacyPreview.rows);
+    const actions = renderToStaticMarkup(
+      <SettlementActions
+        preview={legacyPreview}
+        busy={false}
+        onPrint={() => undefined}
+        onCorrect={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(groups.at(-1)).toMatchObject({
+      name: 'Alter Excel-Rundungsausgleich',
+      tenantShare: 0.01,
+      isLegacyRounding: true,
+    });
+    expect(actions).not.toContain('Drucken / PDF');
+    expect(actions).toContain('Zur Korrektur öffnen');
   });
 });

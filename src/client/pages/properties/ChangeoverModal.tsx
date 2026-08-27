@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { FieldError, FormActions, Modal } from '../../components/Common';
+import { GermanDateInput } from '../../components/GermanDateInput';
 import { parseGermanNumber } from '../../format';
 import type { Meter, Tenancy, Unit } from '../../types';
 import { createEmptyTenancyForm, type TenancyForm } from './formModels';
@@ -168,26 +169,20 @@ export default function ChangeoverModal({
 
   return (
     <Modal wide title={`Mieterwechsel · ${unit?.name ?? ''}`} onClose={onClose}>
-      <form className="form-grid" noValidate onSubmit={handleSubmit}>
+      <form className="form-grid" onSubmit={handleSubmit}>
         <div className="alert alert-info span-2">
           <strong>{tenancy.tenantName}</strong> wird beendet. Nachmieter und Zwischenstände werden
           gemeinsam gespeichert – entweder vollständig oder gar nicht.
         </div>
         <label className="field">
           Letzter Miettag
-          <input
-            type="date"
-            value={endDate}
-            onChange={(event) => updateEndDate(event.target.value)}
-            required
-          />
+          <GermanDateInput value={endDate} onChange={updateEndDate} required />
         </label>
         <label className="field">
           Einzug Nachmieter
-          <input
-            type="date"
+          <GermanDateInput
             value={nextTenancy.startDate}
-            onChange={(event) => updateNextTenancy({ startDate: event.target.value })}
+            onChange={(startDate) => updateNextTenancy({ startDate })}
             required
           />
         </label>

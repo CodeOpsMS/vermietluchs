@@ -5,6 +5,7 @@ import {
   type StatementGroup,
 } from '../domain';
 import type { SqliteDatabase } from './database';
+import { externalizeCostMessages } from './external-messages';
 import type { SettlementCalculator } from './settlements';
 
 type Row = Record<string, unknown>;
@@ -176,20 +177,14 @@ export const sqliteSettlementCalculator: SettlementCalculator = (db, request) =>
     (warning) => !otherTenantNames.some((tenantName) => warning.includes(`, ${tenantName}:`)),
   );
 
-  // Auch in Warnungen wird die externe Bezeichnung verwendet. Die interne
-  // Rechnungsbezeichnung bleibt damit in einer Mieterabrechnung unsichtbar.
-  for (const cost of input.costs) {
-    const tenantDescription = cost.descriptionTenant?.trim();
-    if (!tenantDescription || tenantDescription === cost.descriptionInternal) continue;
-    const internalName = `„${cost.descriptionInternal}“`;
-    const externalName = `„${tenantDescription}“`;
-    result.warnings = result.warnings.map((warning) =>
-      warning.replaceAll(internalName, externalName),
-    );
-    result.blockingReasons = result.blockingReasons.map((reason) =>
-      reason.replaceAll(internalName, externalName),
-    );
-  }
+  // Warnungen verwenden nur die externe Sammelposition. Interne Rechnungsnamen
+  // bleiben damit auch bei zusammengefassten Mieterpositionen unsichtbar.
+  const externalNames = input.costs.map((cost) => ({
+    internalName: cost.descriptionInternal,
+    statementGroup: cost.statementGroup,
+  }));
+  result.warnings = externalizeCostMessages(result.warnings, externalNames);
+  result.blockingReasons = externalizeCostMessages(result.blockingReasons, externalNames);
 
   for (const tenantName of missingPaymentTenantNames) {
     result.warnings.push(

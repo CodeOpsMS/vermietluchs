@@ -36,6 +36,12 @@ Zusätzlich wird entschieden, was in die Mieterabrechnung gelangt:
 Interne und externe Summe können deshalb bewusst verschieden sein. Die App
 verändert diese Entscheidung nie automatisch.
 
+Die Umlagefähigkeit und die Sammelposition sind zwei getrennte Angaben. So
+können intern beispielsweise Wasser, Müllabfuhr und Allgemeinstrom einzelne
+Kostenpositionen bleiben, in der Mieteransicht aber gemeinsam unter „Wohnung“
+erscheinen. Die externe Kostenansicht enthält ausschließlich freigegebene
+Positionen; offene Prüffälle bleiben im eigenen Prüfbereich.
+
 ## Verteilung
 
 Standardkosten werden für das Kalenderjahr nach dem gewählten Schlüssel
@@ -52,8 +58,12 @@ Anteil eines konkreten Mietverhältnisses. Er wird deshalb nicht noch einmal nac
 Tagen gekürzt. Eine Direktzuordnung hat immer genau ein Ziel, damit die
 Berechnung eindeutig bleibt.
 
-Wohnung, Garage und Grundsteuer sind die vorbereiteten Abrechnungsgruppen. Für
-besondere Fälle können weitere Gruppen wie „Aufzug“ angelegt werden.
+Wohnung, Garage und Grundsteuer sind die vorbereiteten Sammelpositionen. Für
+besondere Fälle können weitere Positionen wie „Aufzug“ angelegt werden. Jede
+interne Kostenposition wird zuerst mit ihrem eigenen Schlüssel centgenau
+verteilt. Erst danach fasst die Darstellung die fertigen Mieteranteile je
+Sammelposition zusammen. Unterschiedliche Verteilungsschlüssel bleiben im
+Mieterschreiben als Berechnungshinweis sichtbar.
 
 ## Zählerwechsel und Interpolation
 

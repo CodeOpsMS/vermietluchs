@@ -1,4 +1,5 @@
 import { FieldError, FormActions, Modal, SaveForm } from '../../components/Common';
+import { GermanDateInput } from '../../components/GermanDateInput';
 import type { ReadingForm } from './meter-model';
 
 type ReadingFormModalProps = {
@@ -23,10 +24,9 @@ export function ReadingFormModal({
       <SaveForm className="form-grid" onSubmit={onSave}>
         <label className="field">
           Datum
-          <input
-            type="date"
+          <GermanDateInput
             value={form.date}
-            onChange={(event) => onChange({ ...form, date: event.target.value })}
+            onChange={(date) => onChange({ ...form, date })}
             required
           />
         </label>

@@ -56,7 +56,10 @@ async function seedApplication(request: APIRequestContext) {
   });
 
   const costs = [
-    { description: 'Wohnung', group: 'Wohnung', amount: 1102.7 },
+    { description: 'Interne Wasserrechnung', group: 'Wohnung', amount: 300 },
+    { description: 'Interne Müllrechnung', group: 'Wohnung', amount: 200 },
+    { description: 'Interner Allgemeinstrom', group: 'Wohnung', amount: 100 },
+    { description: 'Weitere Wohnungskosten', group: 'Wohnung', amount: 502.7 },
     { description: 'Garage', group: 'Garage', amount: 4.99 },
     { description: 'Grundsteuer', group: 'Grundsteuer', amount: 62 },
   ];
@@ -254,7 +257,11 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await dialog
       .getByLabel('Korrespondenzanschrift', { exact: true })
       .fill('Mieterweg 2, 12345 Teststadt');
-    await dialog.getByLabel('Mietbeginn', { exact: true }).fill('2024-01-01');
+    await expect(dialog.getByLabel('Mietbeginn', { exact: true })).toHaveAttribute(
+      'placeholder',
+      'TT.MM.JJJJ',
+    );
+    await dialog.getByLabel('Mietbeginn', { exact: true }).fill('01.01.2024');
     await dialog.getByLabel('Kaltmiete / Monat', { exact: true }).fill('500');
     await dialog.getByLabel('NK-Vorauszahlung / Monat', { exact: true }).fill('100');
     await dialog.getByLabel('Garage / Monat', { exact: true }).fill('0');
@@ -264,14 +271,27 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await testUnit.locator('summary').filter({ hasText: 'Mietverlauf (1)' }).click();
     await testUnit.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Mietverhältnis bearbeiten' });
+    await expect(dialog.getByLabel('Mietbeginn', { exact: true })).toHaveValue('01.01.2024');
+    await dialog.getByLabel('Mietende (optional)', { exact: true }).fill('31.02.2024');
+    await dialog.getByLabel('Mietende (optional)', { exact: true }).press('Tab');
+    await expect(dialog.getByLabel('Mietende (optional)', { exact: true })).toHaveValue('');
     await dialog.getByLabel('Name', { exact: true }).fill('E2E Testmieter geändert');
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
     await expect(testUnit.locator('details')).toHaveAttribute('open', '');
     await testUnit.getByRole('button', { name: 'Mieterwechsel', exact: true }).click();
-    await expect(
-      page.getByRole('dialog', { name: 'Mieterwechsel · E2E Testwohnung' }),
-    ).toBeVisible();
+    dialog = page.getByRole('dialog', { name: 'Mieterwechsel · E2E Testwohnung' });
+    await expect(dialog).toBeVisible();
+    const lastTenancyDay = dialog.getByLabel('Letzter Miettag', { exact: true });
+    await lastTenancyDay.fill('30.06.2024');
+    await lastTenancyDay.fill('31.02.2024');
+    await lastTenancyDay.press('Enter');
+    expect(
+      await lastTenancyDay.evaluate((input) => (input as HTMLInputElement).validationMessage),
+    ).not.toBe('');
+    await expect(dialog.locator('.field-error')).toHaveCount(0);
+    await lastTenancyDay.fill('31.07.2024');
+    await expect(dialog.getByLabel('Einzug Nachmieter', { exact: true })).toHaveValue('01.08.2024');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await acceptDialogAfter(page, () =>
@@ -317,13 +337,14 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     const waterMeter = page.locator('.meter-card').filter({ hasText: 'Kaltwasser Bad' });
     await waterMeter.getByRole('button', { name: '+ Ablesung', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Ablesung erfassen' });
-    await dialog.getByLabel('Datum', { exact: true }).fill('2024-06-30');
+    await dialog.getByLabel('Datum', { exact: true }).fill('30.06.2024');
     await dialog.getByLabel('Zählerstand', { exact: true }).fill('130');
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await page
       .getByRole('button', { name: 'Ablesung vom 30.06.2024 bearbeiten', exact: true })
       .click();
     dialog = page.getByRole('dialog', { name: 'Ablesung bearbeiten' });
+    await expect(dialog.getByLabel('Datum', { exact: true })).toHaveValue('30.06.2024');
     await dialog.getByLabel('Zählerstand', { exact: true }).fill('131');
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(waterMeter).toContainText('131 m³');
@@ -342,7 +363,7 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await dialog.getByLabel('Originalbetrag', { exact: true }).fill('10');
     await dialog
       .locator('label')
-      .filter({ hasText: /^Mieterstatus/ })
+      .filter({ hasText: /^Umlagefähigkeit/ })
       .locator('select')
       .selectOption('excluded');
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
@@ -367,10 +388,38 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(metric(page, 'Originalkosten intern')).toContainText(/1\.169,69\s*€/);
     await expect(metric(page, 'Freigegeben extern')).toContainText(/1\.169,69\s*€/);
     await expect(metric(page, 'Noch nicht umgelegt')).toContainText(/0,00\s*€/);
+    await page.getByRole('button', { name: '+ Kostenposition', exact: true }).click();
+    dialog = page.getByRole('dialog', { name: 'Kostenposition erfassen' });
+    await dialog
+      .locator('label')
+      .filter({ hasText: /^Interne Bezeichnung/ })
+      .locator('input')
+      .fill('E2E offene Kosten');
+    await dialog.getByLabel('Originalbetrag', { exact: true }).fill('25');
+    await dialog
+      .locator('label')
+      .filter({ hasText: /^Umlagefähigkeit/ })
+      .locator('select')
+      .selectOption('pending');
+    await dialog
+      .locator('label')
+      .filter({ hasText: /^Sammelposition für den Mieter/ })
+      .locator('input')
+      .fill('Nur intern offen');
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     await page.getByRole('button', { name: /Extern · Mieter/ }).click();
     await expect(page.getByRole('button', { name: /Extern · Mieter/ })).toHaveClass(/active/);
+    await expect(page.locator('.cost-table tbody tr')).toHaveCount(3);
     await expect(page.locator('.cost-table tbody')).toContainText('Wohnung');
+    await expect(page.locator('.cost-table tbody')).not.toContainText('Interne Wasserrechnung');
+    await expect(page.locator('.cost-table tbody')).not.toContainText('E2E offene Kosten');
+    await expect(page.locator('.cost-table tbody')).not.toContainText('Nur intern offen');
+    await expect(page.locator('.cost-table tfoot')).toContainText(/1\.169,69\s*€/);
     await page.getByRole('button', { name: /Prüfung offen/ }).click();
+    await expect(page.locator('.cost-table tbody')).toContainText('E2E offene Kosten');
+    await acceptDialogAfter(page, () =>
+      page.getByRole('button', { name: /Kostenposition „E2E offene Kosten“ löschen/ }).click(),
+    );
     await expect(
       page.getByRole('heading', { level: 3, name: 'Keine offenen Prüffälle' }),
     ).toBeVisible();
@@ -393,6 +442,7 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
       .getByRole('button', { name: 'Buchung vom 03.01.2024 bearbeiten', exact: true })
       .click();
     dialog = page.getByRole('dialog', { name: 'Buchung bearbeiten' });
+    await expect(dialog.getByLabel('Fälligkeit', { exact: true })).toHaveValue('03.01.2024');
     await expect(
       dialog
         .locator('label')
@@ -411,6 +461,9 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(paper).toContainText(/1\.102,70\s*€/);
     await expect(paper).toContainText(/4,99\s*€/);
     await expect(paper).toContainText(/62,00\s*€/);
+    await expect(paper.locator('.statement-group tbody tr')).toHaveCount(3);
+    await expect(paper).not.toContainText('Interne Wasserrechnung');
+    await expect(paper).not.toContainText('Interne Müllrechnung');
     await expect(paper.locator('.settlement-total')).toContainText(/1\.169,69\s*€/);
     await expect(paper.locator('.settlement-total')).toContainText(/1\.050,00\s*€/);
     await expect(paper.locator('.settlement-total')).toContainText(/119,69\s*€/);

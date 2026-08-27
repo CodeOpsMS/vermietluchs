@@ -811,6 +811,7 @@ describe('HTTP-API und SQLite-Persistenz', () => {
       totalTenantShare: 999.01,
       balance: 999.01,
       roundingDifference: 0.01,
+      warnings: ['„Nur intern gespeicherter Name“: Die Wohnflächenbasis fehlt.'],
     };
     db.prepare('UPDATE settlement_snapshots SET payload_json = ? WHERE id = ?').run(
       JSON.stringify(legacyPayload),
@@ -821,6 +822,8 @@ describe('HTTP-API und SQLite-Persistenz', () => {
       .expect(200);
     expect(legacy.body).toMatchObject({ roundingDifference: 0.01, totalTenantShare: 999.01 });
     expect(legacy.body.rows.at(-1).isRoundingDifference).toBe(true);
+    expect(legacy.body.warnings).toEqual(['„Betriebskosten“: Die Wohnflächenbasis fehlt.']);
+    expect(legacy.body.warnings.join('\n')).not.toContain('Nur intern gespeicherter Name');
 
     const legacyCorrection = await request(app)
       .post(
@@ -1085,7 +1088,9 @@ describe('HTTP-API und SQLite-Persistenz', () => {
     expect(preview.body.warnings.join('\n')).toContain('Ausgewählter Mieter');
     expect(preview.body.warnings.join('\n')).not.toContain('Anderer Mieter');
     expect(preview.body.warnings.join('\n')).not.toContain('Interne Wasserrechnung');
-    expect(preview.body.warnings.join('\n')).toContain('„Heizkosten“');
+    expect(preview.body.warnings.join('\n')).toContain('„Wohnung“');
+    expect(preview.body.warnings.join('\n')).not.toContain('„Kaltwasser“');
+    expect(preview.body.warnings.join('\n')).not.toContain('„Heizkosten“');
     expect(preview.body.warnings.join('\n')).not.toContain('Interner Heizkostenbeleg');
   });
 

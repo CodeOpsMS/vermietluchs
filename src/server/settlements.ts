@@ -5,6 +5,7 @@ import type { CostCalculationResult, SettlementResult, TenancyStatement } from '
 import { dateSchema, settlementCloseSchema, settlementCreateSchema } from '../shared/schemas';
 import type { SqliteDatabase } from './database';
 import { ApiError } from './errors';
+import { externalizeCostMessages } from './external-messages';
 import { optionalId, optionalYear, parseId, revisionFromIfMatch } from './http';
 
 export type SettlementRequest = {
@@ -136,7 +137,18 @@ function findSnapshot(
 }
 
 function snapshotPayload(row: SnapshotRow) {
-  return settlementPayloadSchema.parse(JSON.parse(row.payload_json));
+  const payload = settlementPayloadSchema.parse(JSON.parse(row.payload_json));
+  const externalNames = payload.rows
+    .filter((item) => !item.isRoundingDifference)
+    .map((item) => ({
+      internalName: item.description,
+      statementGroup: item.statementGroup,
+    }));
+  return {
+    ...payload,
+    warnings: externalizeCostMessages(payload.warnings, externalNames, true),
+    blockingReasons: externalizeCostMessages(payload.blockingReasons, externalNames, true),
+  };
 }
 
 function contextFor(db: SqliteDatabase, input: SettlementRequest): SettlementContext {
