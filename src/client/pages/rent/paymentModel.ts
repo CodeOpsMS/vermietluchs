@@ -59,6 +59,14 @@ export function paidTotal(parts: PaidParts): number {
   return Math.round((parts.baseRentPaid + parts.utilityPaid + parts.garagePaid) * 100) / 100;
 }
 
+export function isPaymentDueDateInYear(dueDate: string, year: number): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate);
+  if (!match || Number(match[1]) !== year) return false;
+
+  const parsed = new Date(`${dueDate}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === dueDate;
+}
+
 function firstDueDate(tenancy: Tenancy | undefined, year: number): string {
   if (!tenancy) return '';
   const yearStart = `${year}-01-01`;

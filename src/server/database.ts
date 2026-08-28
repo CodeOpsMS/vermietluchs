@@ -33,17 +33,42 @@ export function runMigrations(db: SqliteDatabase, migrationsDir: string): void {
     ) STRICT;
   `);
 
-  const files = fs
+  const migrations = fs
     .readdirSync(migrationsDir)
     .filter((name) => /^\d+.*\.sql$/.test(name))
-    .sort((left, right) => left.localeCompare(right, 'en'));
-  const applied = db.prepare('SELECT 1 FROM schema_migrations WHERE version = ?');
+    .sort((left, right) => left.localeCompare(right, 'en'))
+    .map((name) => ({ name, version: Number.parseInt(name, 10) }));
+
+  const migrationByVersion = new Map<number, string>();
+  for (const migration of migrations) {
+    if (!Number.isSafeInteger(migration.version)) {
+      throw new Error(`Ungültiger Migrationsname: ${migration.name}`);
+    }
+    const duplicate = migrationByVersion.get(migration.version);
+    if (duplicate) {
+      throw new Error(
+        `Doppelte Migrationsversion ${migration.version}: ${duplicate} und ${migration.name}`,
+      );
+    }
+    migrationByVersion.set(migration.version, migration.name);
+  }
+  migrations.sort(
+    (left, right) => left.version - right.version || left.name.localeCompare(right.name, 'en'),
+  );
+
+  const applied = db.prepare('SELECT name FROM schema_migrations WHERE version = ?');
   const record = db.prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)');
 
-  for (const name of files) {
-    const version = Number.parseInt(name, 10);
-    if (!Number.isSafeInteger(version)) throw new Error(`Ungültiger Migrationsname: ${name}`);
-    if (applied.get(version)) continue;
+  for (const { name, version } of migrations) {
+    const existing = applied.get(version) as { name: string } | undefined;
+    if (existing) {
+      if (existing.name !== name) {
+        throw new Error(
+          `Migrationsversion ${version} wurde als ${existing.name} angewendet, heißt jetzt aber ${name}.`,
+        );
+      }
+      continue;
+    }
     const sql = fs.readFileSync(path.join(migrationsDir, name), 'utf8');
     db.transaction(() => {
       db.exec(sql);

@@ -38,7 +38,7 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
   } | null>(null);
 
   const pendingCostCount = data.costs.filter(
-    (cost) => cost.year === year && cost.tenantStatus === 'pending',
+    (cost) => cost.year === (preview?.year ?? year) && cost.tenantStatus === 'pending',
   ).length;
   const selectableTenancies = useMemo(() => {
     const selected = data.tenancies.find((tenancy) => tenancy.id === preview?.tenancyId);
@@ -117,6 +117,7 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
       const snapshot = await getJson<SettlementPreview>(
         `/api/settlements/${snapshotId}?propertyId=${propertyId}`,
       );
+      setTenancyId(snapshot.tenancyId);
       setPreview(snapshot);
       setCorrection(null);
       setError('');
@@ -298,7 +299,7 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
           tenancies={data.tenancies}
           units={data.units}
           loading={archiveLoading}
-          busySnapshotId={archiveBusyId}
+          busySnapshotId={loading ? -1 : archiveBusyId}
           openSnapshotId={preview?.closed ? preview.snapshotId : null}
           error={archiveError}
           onOpen={(snapshotId) => void openSnapshot(snapshotId)}

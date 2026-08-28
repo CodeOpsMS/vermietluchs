@@ -96,6 +96,21 @@ export function createEmptyCostForm(): CostForm {
   };
 }
 
+/**
+ * Hält den umlagefähigen Betrag beim Tippen am Originalbetrag, solange er
+ * nicht bewusst abweichend editiert wurde.
+ */
+export function updateCostSourceAmount(form: CostForm, sourceAmount: string): CostForm {
+  const allocableAmountFollowsSource =
+    form.allocableAmount === '' || form.allocableAmount === form.sourceAmount;
+
+  return {
+    ...form,
+    sourceAmount,
+    allocableAmount: allocableAmountFollowsSource ? sourceAmount : form.allocableAmount,
+  };
+}
+
 export function createCostFormForEditing(cost: Cost): CostForm {
   return {
     id: cost.id,

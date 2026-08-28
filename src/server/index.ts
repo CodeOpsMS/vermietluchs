@@ -6,9 +6,17 @@ import { openDatabase } from './database';
 const dataDir = path.resolve(process.env.VERMIETLUCHS_DATA_DIR ?? path.join(process.cwd(), 'data'));
 fs.mkdirSync(dataDir, { recursive: true });
 const db = openDatabase(path.join(dataDir, 'vermietluchs.sqlite'));
-const app = createApp({ db, staticDir: path.resolve(process.cwd(), 'dist/client') });
 const port = Number(process.env.VERMIETLUCHS_PORT ?? 3001);
 const host = process.env.VERMIETLUCHS_HOST ?? '127.0.0.1';
+const allowedHosts = (process.env.VERMIETLUCHS_ALLOWED_HOSTS ?? '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+const app = createApp({
+  db,
+  staticDir: path.resolve(process.cwd(), 'dist/client'),
+  allowedHosts: [host, ...allowedHosts],
+});
 
 const server = app.listen(port, host, () => {
   console.log(`Vermietluchs läuft unter http://${host}:${port}`);

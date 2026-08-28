@@ -140,12 +140,13 @@ function validateCostReferences(db: SqliteDatabase, values: DatabaseValues): voi
   if (values.direct_tenancy_id !== null) {
     const row = db
       .prepare(
-        `SELECT unit.property_id
+        `SELECT unit.property_id, tenancy.start_date, tenancy.end_date
         FROM tenancies tenancy
         JOIN units unit ON unit.id = tenancy.unit_id
         WHERE tenancy.id = ?`,
       )
-      .get(values.direct_tenancy_id) as { property_id: number } | undefined;
+      .get(values.direct_tenancy_id) as
+      { property_id: number; start_date: string; end_date: string | null } | undefined;
     if (!row) {
       throw new ApiError(400, 'Das direkt zugeordnete Mietverhältnis existiert nicht.');
     }
@@ -154,6 +155,13 @@ function validateCostReferences(db: SqliteDatabase, values: DatabaseValues): voi
         400,
         'Das direkt zugeordnete Mietverhältnis gehört zu einem anderen Objekt.',
       );
+    }
+    const selectedYear = Number(values.year);
+    if (
+      row.start_date > `${selectedYear}-12-31` ||
+      (row.end_date !== null && row.end_date < `${selectedYear}-01-01`)
+    ) {
+      throw new ApiError(400, 'Das direkt zugeordnete Mietverhältnis liegt nicht im Kostenjahr.');
     }
   }
 }

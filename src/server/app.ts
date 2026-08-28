@@ -6,7 +6,7 @@ import { registerBackupRoutes } from './backup';
 import { registerChangeoverRoute } from './changeovers';
 import { registerDashboardRoute } from './dashboard';
 import { errorHandler, notFoundHandler } from './errors';
-import { sameOriginWrites } from './http';
+import { requireAllowedHost, sameOriginWrites } from './http';
 import { registerPaymentGenerationRoute } from './payment-generation';
 import { registerResourceRoutes } from './routes';
 import { sqliteSettlementCalculator } from './settlement-calculator';
@@ -18,6 +18,7 @@ export type AppOptions = {
   db: SqliteDatabase;
   staticDir?: string;
   settlementCalculator?: SettlementCalculator | null;
+  allowedHosts?: string[];
 };
 
 export function createApp(options: AppOptions) {
@@ -37,6 +38,7 @@ export function createApp(options: AppOptions) {
     );
     next();
   });
+  app.use(requireAllowedHost(options.allowedHosts));
   app.use(express.json({ limit: '50mb' }));
 
   const api = express.Router();
@@ -47,11 +49,12 @@ export function createApp(options: AppOptions) {
   });
   api.get('/health', (_request, response) => {
     const quickCheck = options.db.pragma('quick_check') as Array<{ quick_check: string }>;
+    const healthy = quickCheck.every((entry) => entry.quick_check === 'ok');
     const migration = options.db
       .prepare('SELECT max(version) AS version FROM schema_migrations')
       .get() as { version: number | null };
-    response.json({
-      ok: quickCheck.every((entry) => entry.quick_check === 'ok'),
+    response.status(healthy ? 200 : 503).json({
+      ok: healthy,
       database: quickCheck.map((entry) => entry.quick_check),
       schemaVersion: migration.version ?? 0,
     });

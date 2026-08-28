@@ -29,7 +29,7 @@ export function GermanDateInput({ value, onChange, onBlur, ...props }: GermanDat
       {...props}
       ref={inputRef}
       type="text"
-      inputMode="numeric"
+      inputMode="text"
       maxLength={10}
       pattern="[0-9]{2}[.][0-9]{2}[.][0-9]{4}"
       placeholder="TT.MM.JJJJ"
@@ -45,9 +45,11 @@ export function GermanDateInput({ value, onChange, onBlur, ...props }: GermanDat
       }}
       onBlur={(event) => {
         if (event.currentTarget.value && !germanDateToIso(event.currentTarget.value)) {
-          event.currentTarget.value = '';
-          event.currentTarget.setCustomValidity('');
-          onChange('');
+          // Den Tippfehler sichtbar stehen lassen und das Speichern blockieren. Vor allem bei
+          // optionalen Feldern darf ein ungültiges Datum nicht still zu "kein Datum" werden.
+          event.currentTarget.setCustomValidity(
+            'Bitte ein gültiges Datum als TT.MM.JJJJ eingeben.',
+          );
         }
         onBlur?.(event);
       }}

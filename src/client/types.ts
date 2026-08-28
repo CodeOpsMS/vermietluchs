@@ -55,6 +55,8 @@ export type SettlementRow = {
 };
 
 export type SettlementPreview = {
+  /** Kennzeichnet Snapshots, deren externe Texte bereits vor dem Hash finalisiert wurden. */
+  payloadVersion?: 2;
   propertyId: number;
   tenancyId: number;
   year: number;

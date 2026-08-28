@@ -46,8 +46,10 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
       !window.confirm(
         'Das Backup ersetzt den aktuellen Datenbestand vollständig. Vorher solltest du ein frisches Export-Backup speichern. Fortfahren?',
       )
-    )
+    ) {
+      if (fileRef.current) fileRef.current.value = '';
       return;
+    }
     setBusy(true);
     setError('');
     setMessage('');

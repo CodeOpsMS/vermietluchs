@@ -29,15 +29,29 @@ Jahren Programmiererfahrung gut nachvollziehbar bleibt.
 Voraussetzung ist Docker Desktop oder Docker Engine mit Compose.
 
 ```bash
-git clone git@github.com:CodeOpsMS/vermietluchs.git
+git clone https://github.com/CodeOpsMS/vermietluchs.git
 cd vermietluchs
-docker compose up -d --build
+docker compose up -d
 ```
 
 Danach öffnest du `http://localhost:3001`. Die SQLite-Datenbank und
 Sicherheitskopien liegen dauerhaft im Docker-Volume `vermietluchs-data`.
 Von einem anderen Gerät im selben vertrauenswürdigen Netz verwendest du
 `http://IP-DEINES-RECHNERS:3001`.
+
+Compose lädt standardmäßig das aktuelle Image aus GitHub Packages. Eine
+bestimmte Version lässt sich reproduzierbar festhalten:
+
+```bash
+VERMIETLUCHS_VERSION=0.0.1 docker compose up -d
+```
+
+Falls das GitHub-Container-Package noch privat ist, musst du dich vor dem
+ersten Start mit einem Token mit `read:packages` anmelden:
+
+```bash
+docker login ghcr.io -u CodeOpsMS
+```
 
 Container stoppen:
 
@@ -47,6 +61,30 @@ docker compose down
 
 Vor einem Update empfiehlt sich zusätzlich ein JSON-Export unter
 **Einstellungen → Datensicherung**.
+
+Danach wird das aktuelle Image so geladen und der Container neu erstellt:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+## Releases und Container-Paket
+
+Nach jedem erfolgreich geprüften Merge eines Pull Requests nach `main` erzeugt
+GitHub Actions automatisch die nächste Patch-Version. Die erste Version ist
+`v0.0.1`, danach folgen `v0.0.2`, `v0.0.3` und so weiter. Zum gleichen Stand
+werden ein GitHub Release und ein Linux-Container für AMD64 und ARM64 unter
+`ghcr.io/codeopsms/vermietluchs` veröffentlicht.
+
+Verfügbare Image-Tags sind die exakte Version (`0.0.1` und `v0.0.1`), `latest`
+und ein unveränderlicher Commit-Tag. Der Workflow lässt sich für den aktuellen
+Stand auch manuell starten und bleibt dabei versionsstabil. Ein direkter Push
+auf `main` veröffentlicht kein Release.
+
+GitHub legt das Package beim ersten Lauf standardmäßig privat an. Soll das Image
+ohne Anmeldung ladbar sein, muss dessen Sichtbarkeit einmalig in den
+Package-Einstellungen auf **Public** gestellt werden.
 
 ## Lokale Entwicklung
 
@@ -68,12 +106,16 @@ npm run check
 npm run test:e2e
 ```
 
-`npm run check` prüft TypeScript, Stilregeln, Fachtests und den Produktions-Build.
+`npm run check` prüft Formatierung, TypeScript, Stilregeln, alle Vitest-Tests,
+Coverage-Mindestwerte und den Produktions-Build. Der ausführliche lokale
+Coverage-Bericht liegt anschließend unter `coverage/index.html`.
 `npm run test:e2e` startet zusätzlich eine isolierte temporäre Datenbank und
 klickt die wichtigsten Buttons und Zahlen in einem echten Chromium-Browser
 durch. Beim ersten lokalen Lauf wird Chromium mit
 `npx playwright install chromium` installiert. Die GitHub-Pipeline führt beide
-Prüfungen automatisch aus.
+Prüfungen automatisch aus und speichert den Coverage-Bericht 14 Tage als
+Artefakt. Details und die geltenden Grenzwerte stehen in
+[docs/TESTING.md](docs/TESTING.md).
 
 ## Ein sinnvoller erster Durchlauf
 
@@ -107,22 +149,30 @@ docs/             Architektur- und Fachnotizen
 ```
 
 Weitere Erklärungen stehen in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) und
-[docs/DOMAIN.md](docs/DOMAIN.md). Hinweise zum sicheren Betrieb findest du in
-[SECURITY.md](SECURITY.md).
+[docs/DOMAIN.md](docs/DOMAIN.md). Eine Übersicht der Laufzeit-, Entwicklungs-
+und Betriebsabhängigkeiten steht in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
+Die Ergebnisse des vollständigen Reviews sind in
+[docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) dokumentiert. Hinweise zum sicheren
+Betrieb findest du in [SECURITY.md](SECURITY.md). Die Teststrategie und
+Coverage-Grenzen beschreibt [docs/TESTING.md](docs/TESTING.md).
 
 ## Konfiguration
 
 Im Container sind die passenden Werte bereits gesetzt. Beim lokalen Start
 können diese Umgebungsvariablen angepasst werden:
 
-| Variable                | Standard    | Bedeutung                               |
-| ----------------------- | ----------- | --------------------------------------- |
-| `VERMIETLUCHS_PORT`     | `3001`      | HTTP-Port                               |
-| `VERMIETLUCHS_HOST`     | `127.0.0.1` | lokale Bind-Adresse                     |
-| `VERMIETLUCHS_DATA_DIR` | `./data`    | Ordner für SQLite und Sicherheitskopien |
+| Variable                     | Standard    | Bedeutung                                    |
+| ---------------------------- | ----------- | -------------------------------------------- |
+| `VERMIETLUCHS_PORT`          | `3001`      | HTTP-Port                                    |
+| `VERMIETLUCHS_HOST`          | `127.0.0.1` | lokale Bind-Adresse                          |
+| `VERMIETLUCHS_DATA_DIR`      | `./data`    | Ordner für SQLite und Sicherheitskopien      |
+| `VERMIETLUCHS_ALLOWED_HOSTS` | leer        | zusätzliche DNS-Namen, durch Kommas getrennt |
+| `VERMIETLUCHS_VERSION`       | `latest`    | von Docker Compose zu ladender Container-Tag |
 
 Nur der Docker-Start setzt den Host bewusst auf `0.0.0.0`, damit Geräte im
-vertrauenswürdigen Heimnetz die App erreichen können.
+vertrauenswürdigen Heimnetz die App erreichen können. Zugriffe per IP-Adresse
+und `localhost` sind automatisch erlaubt. Für einen Namen wie `nas.example.lan`
+setzt du `VERMIETLUCHS_ALLOWED_HOSTS=nas.example.lan`.
 
 ## Datenschutz und Verantwortung
 

@@ -1,9 +1,14 @@
-name: Prüfen
+name: Prüfen und veröffentlichen
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('vermietluchs-pr-{0}', github.event.pull_request.number) || 'vermietluchs-main-release' }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -27,6 +32,15 @@ jobs:
       - name: Code und Berechnungen prüfen
         run: npm run check
 
+      - name: Coverage-Bericht speichern
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vitest-coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Chromium für Oberflächentest installieren
         run: npx playwright install --with-deps chromium
 
@@ -49,3 +63,155 @@ jobs:
 
       - name: Docker-Image bauen
         run: docker build --tag vermietluchs:test .
+
+      - name: Docker-Image starten und Healthcheck prüfen
+        run: |
+          container_id="$(docker run --detach --publish 127.0.0.1:3001:3001 vermietluchs:test)"
+          trap 'docker rm --force "$container_id" >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:3001/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$container_id"
+          exit 1
+
+  release:
+    name: Release und Container veröffentlichen
+    needs: check
+    if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: read
+      attestations: write
+      id-token: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: codeopsms/vermietluchs
+    steps:
+      - name: Merge nach main bestätigen
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          merged_prs="$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+            --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | length')"
+          if (( merged_prs > 0 )); then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Der Commit gehört zu keinem gemergten Pull Request nach main; kein Release."
+          fi
+
+      - name: Repository und Tags laden
+        if: steps.gate.outputs.publish == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Nächste Patch-Version bestimmen
+        if: steps.gate.outputs.publish == 'true'
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          semver_pattern='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          existing_tag="$(git tag --points-at "$GITHUB_SHA" --list 'v*' --sort=-v:refname \
+            | awk -v pattern="$semver_pattern" '$0 ~ pattern { print; exit }')"
+
+          if [[ -n "$existing_tag" ]]; then
+            version="${existing_tag#v}"
+          else
+            latest_tag="$(git tag --list 'v*' --sort=-v:refname \
+              | awk -v pattern="$semver_pattern" '$0 ~ pattern { print; exit }')"
+            if [[ -z "$latest_tag" ]]; then
+              version="$(node --print "require('./package.json').version")"
+              if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "Ungültige Startversion: $version" >&2
+                exit 1
+              fi
+            else
+              IFS=. read -r major minor patch_number <<< "${latest_tag#v}"
+              version="${major}.${minor}.$((patch_number + 1))"
+            fi
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: QEMU einrichten
+        if: steps.gate.outputs.publish == 'true'
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Docker Buildx einrichten
+        if: steps.gate.outputs.publish == 'true'
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Bei GitHub Container Registry anmelden
+        if: steps.gate.outputs.publish == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Image-Tags und OCI-Metadaten erzeugen
+        if: steps.gate.outputs.publish == 'true'
+        id: metadata
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.tag }}
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: Multi-Arch-Image bauen und veröffentlichen
+        if: steps.gate.outputs.publish == 'true'
+        id: push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha,scope=release
+          cache-to: type=gha,mode=max,scope=release
+          sbom: true
+
+      - name: Herkunftsnachweis veröffentlichen
+        if: steps.gate.outputs.publish == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: GitHub Release anlegen
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG existiert bereits."
+          else
+            gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "Vermietluchs $RELEASE_VERSION" \
+              --generate-notes
+          fi

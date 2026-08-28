@@ -33,6 +33,7 @@ function encodePayment(value: PaymentInput): DatabaseValues {
   const amountPaidCents = eurosToCents(value.amountPaid);
   const baseRentDueCents = eurosToCents(value.baseRentDue);
   const utilityDueCents = eurosToCents(value.utilityDue);
+  const garageDueCents = eurosToCents(value.garageDue);
   const explicitParts =
     value.baseRentPaid !== undefined ||
     value.utilityPaid !== undefined ||
@@ -58,7 +59,13 @@ function encodePayment(value: PaymentInput): DatabaseValues {
     baseRentPaidCents = Math.min(amountPaidCents, baseRentDueCents);
     const amountAfterRent = amountPaidCents - baseRentPaidCents;
     utilityPaidCents = Math.min(amountAfterRent, utilityDueCents);
-    garagePaidCents = amountAfterRent - utilityPaidCents;
+    garagePaidCents = Math.min(amountAfterRent - utilityPaidCents, garageDueCents);
+    if (baseRentPaidCents + utilityPaidCents + garagePaidCents !== amountPaidCents) {
+      throw new ApiError(
+        400,
+        'Bei einer Überzahlung müssen die bezahlten Teilbeträge ausdrücklich angegeben werden.',
+      );
+    }
   }
 
   return {
@@ -67,7 +74,7 @@ function encodePayment(value: PaymentInput): DatabaseValues {
     paid_date: value.paidDate,
     base_rent_due_cents: baseRentDueCents,
     utility_due_cents: utilityDueCents,
-    garage_due_cents: eurosToCents(value.garageDue),
+    garage_due_cents: garageDueCents,
     amount_paid_cents: amountPaidCents,
     base_rent_paid_cents: baseRentPaidCents,
     utility_paid_cents: utilityPaidCents,

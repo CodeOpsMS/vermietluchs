@@ -11,6 +11,7 @@ import {
   createEmptyPayment,
   createPaymentForm,
   getPaidParts,
+  isPaymentDueDateInYear,
   paidTotal,
   parsePaidParts,
 } from './rent/paymentModel';
@@ -29,7 +30,7 @@ export default function RentPage({ data, propertyId, year, reload }: PageProps) 
   const yearPayments = useMemo(
     () =>
       data.payments
-        .filter((payment) => payment.dueDate.startsWith(String(year)))
+        .filter((payment) => isPaymentDueDateInYear(payment.dueDate, year))
         .sort((left, right) => left.dueDate.localeCompare(right.dueDate)),
     [data.payments, year],
   );
@@ -81,6 +82,10 @@ export default function RentPage({ data, propertyId, year, reload }: PageProps) 
     }
     if ([baseRentDue, utilityDue, garageDue].some((value) => value < 0)) {
       setError('Beträge dürfen nicht negativ sein.');
+      return;
+    }
+    if (!isPaymentDueDateInYear(form.dueDate, year)) {
+      setError(`Die Fälligkeit muss im ausgewählten Jahr ${year} liegen.`);
       return;
     }
 

@@ -188,6 +188,40 @@ describe('HTTP-API und SQLite-Persistenz', () => {
       .expect(400);
   });
 
+  test('Direktkosten verlangen ein Mietverhältnis im Kostenjahr', async () => {
+    const property = await createProperty();
+    const unit = await createUnit(property.id);
+    const tenancy = (
+      await request(app)
+        .post('/api/tenancies')
+        .send(tenancyInput(unit.id, { startDate: '2023-01-01', endDate: '2023-12-31' }))
+        .expect(201)
+    ).body;
+
+    const response = await request(app)
+      .post('/api/costs')
+      .send({
+        propertyId: property.id,
+        year: 2024,
+        descriptionInternal: 'Direkte Reparatur',
+        descriptionTenant: 'Reparatur',
+        sourceAmount: 100,
+        tenantStatus: 'included',
+        allocableAmount: 100,
+        statementGroup: 'Wohnung',
+        allocationMode: 'fixedTenancy',
+        allocationKey: 'direct',
+        directUnitId: null,
+        directTenancyId: tenancy.id,
+        meterType: null,
+        labor35a: 0,
+        notes: '',
+      })
+      .expect(400);
+
+    expect(response.body.error).toContain('nicht im Kostenjahr');
+  });
+
   test('Mieterwechsel beendet, erstellt und liest atomar ab', async () => {
     const property = await createProperty();
     const unit = await createUnit(property.id);
@@ -523,6 +557,7 @@ describe('HTTP-API und SQLite-Persistenz', () => {
     const input = { propertyId: property.id, tenancyId: tenancy.id, year: 2024 };
     const preview = await request(app).post('/api/settlements/preview').send(input).expect(200);
     expect(preview.body).toMatchObject({
+      payloadVersion: 2,
       tenancyId: tenancy.id,
       totalTenantShare: 1800,
       totalPrepayments: 0,
@@ -793,6 +828,7 @@ describe('HTTP-API und SQLite-Persistenz', () => {
 
     const legacyPayload = {
       ...correctedClose.body,
+      payloadVersion: undefined,
       rows: [
         ...correctedClose.body.rows,
         {
@@ -1085,6 +1121,8 @@ describe('HTTP-API und SQLite-Persistenz', () => {
         year: 2024,
       })
       .expect(200);
+    expect(preview.body.payloadVersion).toBe(2);
+    expect(preview.body.canClose).toBe(true);
     expect(preview.body.warnings.join('\n')).toContain('Ausgewählter Mieter');
     expect(preview.body.warnings.join('\n')).not.toContain('Anderer Mieter');
     expect(preview.body.warnings.join('\n')).not.toContain('Interne Wasserrechnung');
@@ -1092,6 +1130,22 @@ describe('HTTP-API und SQLite-Persistenz', () => {
     expect(preview.body.warnings.join('\n')).not.toContain('„Kaltwasser“');
     expect(preview.body.warnings.join('\n')).not.toContain('„Heizkosten“');
     expect(preview.body.warnings.join('\n')).not.toContain('Interner Heizkostenbeleg');
+
+    const input = {
+      propertyId: property.id,
+      tenancyId: selectedTenancy.id,
+      year: 2024,
+    };
+    const closed = await request(app)
+      .post('/api/settlements/close')
+      .send({ ...input, expectedCalculationToken: preview.body.calculationToken })
+      .expect(201);
+    const fetched = await request(app)
+      .get(`/api/settlements/${closed.body.snapshotId}?propertyId=${property.id}`)
+      .expect(200);
+    expect(fetched.body).toEqual(closed.body);
+    expect(fetched.body.warnings.join('\n')).toContain('„Wohnung“');
+    expect(fetched.body.warnings.join('\n')).not.toContain('„Betriebskosten“');
   });
 
   test('Ist-Zahlungen überschreiben Vertragswerte gruppiert, auch teilweise und mit null Euro', async () => {
@@ -1181,6 +1235,30 @@ describe('HTTP-API und SQLite-Persistenz', () => {
         note: '',
       })
       .expect(400);
+  });
+
+  test('weist nicht zuordenbare Altformat-Überzahlungen zurück', async () => {
+    const property = await createProperty();
+    const unit = await createUnit(property.id);
+    const tenancy = (
+      await request(app).post('/api/tenancies').send(tenancyInput(unit.id)).expect(201)
+    ).body;
+
+    const response = await request(app)
+      .post('/api/payments')
+      .send({
+        tenancyId: tenancy.id,
+        dueDate: '2024-11-03',
+        paidDate: '2024-11-03',
+        baseRentDue: 700,
+        utilityDue: 150,
+        garageDue: 0,
+        amountPaid: 900,
+        note: '',
+      })
+      .expect(400);
+
+    expect(response.body.error).toContain('Überzahlung');
   });
 
   test('Excel-Einzelwerte ergeben ohne manuellen Zusatzcent exakt 119,69 Euro Nachzahlung', async () => {
@@ -1455,10 +1533,22 @@ describe('HTTP-API und SQLite-Persistenz', () => {
       .expect(403);
     await request(app)
       .post('/api/properties')
+      .set('Origin', 'http://angreifer.example')
+      .set('Host', 'angreifer.example')
+      .send(propertyInput)
+      .expect(421);
+    await request(app)
+      .post('/api/properties')
       .set('Origin', 'http://127.0.0.1')
       .set('Host', '127.0.0.1')
       .send(propertyInput)
       .expect(201);
+    const malformed = await request(app)
+      .post('/api/properties')
+      .set('Content-Type', 'application/json')
+      .send('{"name":')
+      .expect(400);
+    expect(malformed.body.error).toContain('JSON');
     const health = await request(app).get('/api/health').expect(200);
     expect(health.headers).toMatchObject({
       'x-content-type-options': 'nosniff',

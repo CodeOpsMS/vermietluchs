@@ -1,6 +1,7 @@
 services:
   vermietluchs:
-    build: .
+    image: ghcr.io/codeopsms/vermietluchs:${VERMIETLUCHS_VERSION:-latest}
+    pull_policy: always
     container_name: vermietluchs
     restart: unless-stopped
     ports:
@@ -9,6 +10,7 @@ services:
       VERMIETLUCHS_PORT: '3001'
       VERMIETLUCHS_HOST: 0.0.0.0
       VERMIETLUCHS_DATA_DIR: /data
+      VERMIETLUCHS_ALLOWED_HOSTS: ${VERMIETLUCHS_ALLOWED_HOSTS:-}
     volumes:
       - vermietluchs-data:/data
 

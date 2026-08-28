@@ -24,6 +24,7 @@ export default function SettlementControls({
       <label className="field">
         Mietverhältnis
         <select
+          disabled={loading}
           value={tenancyId ?? ''}
           onChange={(event) =>
             onTenancyChange(event.target.value ? Number(event.target.value) : null)

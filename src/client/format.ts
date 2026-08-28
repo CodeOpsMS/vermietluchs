@@ -5,9 +5,20 @@ export const number = (value: number | undefined | null, maximumFractionDigits =
   (value ?? 0).toLocaleString('de-DE', { maximumFractionDigits });
 
 export function parseGermanNumber(value: string): number | null {
-  const trimmed = value.trim().replace(/\s|€/g, '');
+  const trimmed = value.trim().replace(/[\s€]/g, '');
   if (!trimmed) return null;
-  const normalized = trimmed.includes(',') ? trimmed.replace(/\./g, '').replace(',', '.') : trimmed;
+
+  let normalized = trimmed;
+  if (trimmed.includes(',')) {
+    if (!/^[+-]?(?:\d+|\d{1,3}(?:\.\d{3})+),\d+$/.test(trimmed)) return null;
+    normalized = trimmed.replace(/\./g, '').replace(',', '.');
+  } else if (/^[+-]?\d{1,3}(?:\.\d{3})+$/.test(trimmed)) {
+    // In einer deutschen Eingabe ist der Punkt in 1.000 ein Tausendertrenner.
+    normalized = trimmed.replace(/\./g, '');
+  } else if (!/^[+-]?\d+(?:\.\d+)?$/.test(trimmed)) {
+    return null;
+  }
+
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }

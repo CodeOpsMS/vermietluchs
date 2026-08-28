@@ -14,6 +14,11 @@ gedacht. Die App besitzt bewusst weder Benutzerkonten noch Anmeldung.
 Same-Origin-Prüfung und Browser-Sicherheitsheader erschweren fremde Webaufrufe,
 ersetzen aber keine Authentifizierung.
 
+Zugriffe über `localhost` und direkte IP-Adressen sind automatisch erlaubt.
+Wird die App über einen eigenen DNS-Namen oder einen privaten Reverse-Proxy
+aufgerufen, muss dieser Name ausdrücklich in `VERMIETLUCHS_ALLOWED_HOSTS`
+eingetragen werden. Mehrere Namen werden durch Kommas getrennt.
+
 ## Sicherheitsproblem melden
 
 Bitte veröffentliche personenbezogene Beispieldaten oder Sicherheitsdetails
