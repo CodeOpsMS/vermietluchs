@@ -1,7 +1,7 @@
 # Teststrategie
 
-Stand: 27. August 2026. Die Suite umfasst 21 Vitest-Dateien mit 192 Tests sowie
-zwei Chromium-End-to-End-Szenarien.
+Stand: 28. August 2026. Die Suite umfasst 21 Vitest-Dateien mit 192 Tests, zwei
+Chromium-End-to-End-Szenarien und zwei Tests des gebauten Container-Images.
 
 ## Prüfungen
 
@@ -11,7 +11,25 @@ zwei Chromium-End-to-End-Szenarien.
 | Integrations- und API-Tests | Express, SQLite, Migrationen, Backups, Konflikte und HTTP-Schutz       | `npm test`              |
 | Coverage                    | gesamter TypeScript-/TSX-Quelltext und strengere Kernschichten         | `npm run test:coverage` |
 | Browser                     | wichtigster Arbeitsablauf mit temporärer Datenbank in Chromium         | `npm run test:e2e`      |
+| Container-Image             | leere Datenbank und reproduzierbare Beispieldaten für 2023             | siehe unten             |
 | vollständige Commit-Prüfung | Format, Typen, Lint, Coverage-Tests und Build                          | `npm run check`         |
+
+Nach dem Bauen des Images prüft die CI zwei vollständig getrennte, neue
+Container ohne Daten-Volume:
+
+```bash
+docker build --tag vermietluchs:test .
+bash scripts/test-container-image.sh vermietluchs:test empty
+bash scripts/test-container-image.sh vermietluchs:test example
+```
+
+Der Leertest kontrolliert über den JSON-Backup-Export, dass sämtliche
+Fachtabellen leer sind. Der Beispieltest beginnt ebenfalls leer, legt über die
+öffentliche API ein synthetisches Haus mit Einheit, Mietverhältnis, Kosten,
+Zahlung, Zähler und Ablesungen für 2023 an und prüft anschließend Export und
+Dashboard. Dadurch kann kein bereits vorhandenes Host-Volume den Test
+beeinflussen. Weil `/data` nicht durch einen Mount verdeckt wird, erkennt der
+Leertest außerdem versehentlich in das Image übernommene Datenbanken.
 
 Der HTML-Bericht wird unter `coverage/index.html` erzeugt. Die CI lädt den
 vollständigen Ordner auch bei einem fehlgeschlagenen Testlauf für 14 Tage als
