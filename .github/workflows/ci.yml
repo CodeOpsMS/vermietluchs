@@ -64,18 +64,11 @@ jobs:
       - name: Docker-Image bauen
         run: docker build --tag vermietluchs:test .
 
-      - name: Docker-Image starten und Healthcheck prüfen
-        run: |
-          container_id="$(docker run --detach --publish 127.0.0.1:3001:3001 vermietluchs:test)"
-          trap 'docker rm --force "$container_id" >/dev/null 2>&1 || true' EXIT
-          for attempt in {1..20}; do
-            if curl --fail --silent http://127.0.0.1:3001/api/health >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          docker logs "$container_id"
-          exit 1
+      - name: Docker-Image mit leerer Datenbank prüfen
+        run: bash scripts/test-container-image.sh vermietluchs:test empty
+
+      - name: Docker-Image mit Beispieldaten prüfen
+        run: bash scripts/test-container-image.sh vermietluchs:test example
 
   release:
     name: Release und Container veröffentlichen
