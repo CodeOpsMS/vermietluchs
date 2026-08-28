@@ -1,4 +1,4 @@
-FROM node:24.19.0-bookworm-slim AS build
+FROM node:26.7.0-bookworm-slim AS build
 
 ARG APP_VERSION=0.0.1
 
@@ -17,7 +17,7 @@ RUN npm pkg set version="${APP_VERSION}" \
     && npm run build \
     && npm prune --omit=dev
 
-FROM node:24.19.0-bookworm-slim AS runtime
+FROM node:26.7.0-bookworm-slim AS runtime
 
 ARG APP_VERSION=0.0.1
 ARG VCS_REF=unknown
