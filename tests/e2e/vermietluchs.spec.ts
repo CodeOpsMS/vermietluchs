@@ -147,7 +147,7 @@ async function dismissDialogAfter(page: Page, action: () => Promise<void>): Prom
   await handled;
 }
 
-test.describe.serial('Vermietluchs-Oberfläche', () => {
+test.describe('Vermietluchs-Oberfläche', () => {
   test('bedient Buttons und zeigt die centgenauen Zahlen', async ({ page }) => {
     await page.clock.setFixedTime(new Date('2026-08-26T08:00:00.000Z'));
     await seedApplication(page.request);
@@ -199,13 +199,22 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(page.getByText('Einstellungen gespeichert.')).toBeVisible();
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'JSON-Backup herunterladen', exact: true }).click();
-    await expect((await downloadPromise).suggestedFilename()).toMatch(
+    const download = await downloadPromise;
+    await expect(download.suggestedFilename()).toMatch(
       /^vermietluchs-backup-\d{4}-\d{2}-\d{2}\.json$/,
     );
+    const backupPath = await download.path();
+    if (!backupPath) throw new Error('Playwright hat keinen Pfad für das Backup bereitgestellt.');
     const chooserPromise = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: 'Backup einspielen', exact: true }).click();
     const chooser = await chooserPromise;
-    await chooser.setFiles([]);
+    const restoreConfirmation = page.waitForEvent('dialog').then(async (confirmation) => {
+      expect(confirmation.message()).toContain('ersetzt den aktuellen Datenbestand vollständig');
+      await confirmation.accept();
+    });
+    await chooser.setFiles(backupPath);
+    await restoreConfirmation;
+    await expect(page.getByText('Backup erfolgreich eingespielt.')).toBeVisible();
 
     await navigate(page, 'Stammdaten', 'Häuser & Wohnungen');
     await page.getByRole('button', { name: '+ Haus anlegen', exact: true }).click();
@@ -272,9 +281,14 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await testUnit.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Mietverhältnis bearbeiten' });
     await expect(dialog.getByLabel('Mietbeginn', { exact: true })).toHaveValue('01.01.2024');
-    await dialog.getByLabel('Mietende (optional)', { exact: true }).fill('31.02.2024');
-    await dialog.getByLabel('Mietende (optional)', { exact: true }).press('Tab');
-    await expect(dialog.getByLabel('Mietende (optional)', { exact: true })).toHaveValue('');
+    const optionalTenancyEnd = dialog.getByLabel('Mietende (optional)', { exact: true });
+    await optionalTenancyEnd.fill('31.02.2024');
+    await optionalTenancyEnd.press('Tab');
+    await expect(optionalTenancyEnd).toHaveValue('31.02.2024');
+    expect(
+      await optionalTenancyEnd.evaluate((input) => (input as HTMLInputElement).validationMessage),
+    ).not.toBe('');
+    await optionalTenancyEnd.fill('');
     await dialog.getByLabel('Name', { exact: true }).fill('E2E Testmieter geändert');
     await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
     testUnit = page.locator('.unit-card').filter({ hasText: 'E2E Testwohnung' });
@@ -360,7 +374,8 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
       .filter({ hasText: /^Interne Bezeichnung/ })
       .locator('input')
       .fill('E2E temporäre Kosten');
-    await dialog.getByLabel('Originalbetrag', { exact: true }).fill('10');
+    await dialog.getByLabel('Originalbetrag', { exact: true }).pressSequentially('10');
+    await expect(dialog.getByLabel('Umlagefähiger Betrag', { exact: true })).toHaveValue('10');
     await dialog
       .locator('label')
       .filter({ hasText: /^Umlagefähigkeit/ })
@@ -453,9 +468,19 @@ test.describe.serial('Vermietluchs-Oberfläche', () => {
     await expect(page.locator('.ledger-table tbody tr')).toHaveCount(7);
 
     await navigate(page, 'Abrechnung', 'Abrechnung 2024');
+    await page.route(
+      '**/api/settlements/preview',
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        await route.continue();
+      },
+      { times: 1 },
+    );
     await page.getByRole('button', { name: 'Vorschau berechnen', exact: true }).click();
+    await expect(page.getByLabel('Mietverhältnis')).toBeDisabled();
     const paper = page.locator('.settlement-paper');
     await expect(paper).toBeVisible();
+    await expect(page.getByLabel('Mietverhältnis')).toBeEnabled();
     await expect(paper).toContainText('Manfred Lämmerzahl');
     await expect(paper).toContainText('Demo Mieter Januar–Juli');
     await expect(paper).toContainText(/1\.102,70\s*€/);

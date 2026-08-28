@@ -3,7 +3,7 @@ import { STATEMENT_GROUPS } from '../../shared/constants';
 import type { PageProps } from '../App';
 import { deleteJson, postJson, putJson } from '../api';
 import { ErrorBox, Notice, PageHeader } from '../components/Common';
-import { parseGermanNumber } from '../format';
+import { activeInYear, parseGermanNumber } from '../format';
 import { CostFormModal } from './costs/CostFormModal';
 import { CostList } from './costs/CostList';
 import { CostMetrics } from './costs/CostMetrics';
@@ -32,6 +32,11 @@ export default function CostsPage({ data, propertyId, year, reload }: PageProps)
       ]),
     ],
     [yearCosts],
+  );
+  const yearTenancies = useMemo(
+    () =>
+      data.tenancies.filter((tenancy) => activeInYear(tenancy.startDate, tenancy.endDate, year)),
+    [data.tenancies, year],
   );
 
   async function run(action: () => Promise<void>) {
@@ -156,7 +161,7 @@ export default function CostsPage({ data, propertyId, year, reload }: PageProps)
           form={form}
           statementGroups={statementGroups}
           units={data.units}
-          tenancies={data.tenancies}
+          tenancies={yearTenancies}
           error={error}
           busy={busy}
           onChange={setForm}

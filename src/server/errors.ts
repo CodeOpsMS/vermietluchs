@@ -23,6 +23,14 @@ export const notFoundHandler: RequestHandler = (_request, response) => {
 
 export const errorHandler: ErrorRequestHandler = (error: unknown, request, response, next) => {
   void next; // Vier Parameter sind nötig, damit Express die Funktion als Error-Middleware erkennt.
+  if (error instanceof Error && 'type' in error && error.type === 'entity.parse.failed') {
+    response.status(400).json({ error: 'Der JSON-Inhalt ist ungültig.' });
+    return;
+  }
+  if (error instanceof Error && 'type' in error && error.type === 'entity.too.large') {
+    response.status(413).json({ error: 'Die Anfrage ist größer als das erlaubte Limit.' });
+    return;
+  }
   if (error instanceof ZodError) {
     response.status(400).json({ error: 'Die Eingabe ist ungültig.', issues: error.issues });
     return;

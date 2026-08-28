@@ -8,7 +8,7 @@ import type {
   TenantStatus,
   Unit,
 } from '../../types';
-import { KEY_LABEL, METER_LABEL, type CostForm } from './cost-model';
+import { KEY_LABEL, METER_LABEL, updateCostSourceAmount, type CostForm } from './cost-model';
 
 type CostFormModalProps = {
   form: CostForm;
@@ -56,14 +56,7 @@ export function CostFormModal({
           <input
             inputMode="decimal"
             value={form.sourceAmount}
-            onChange={(event) => {
-              const sourceAmount = event.target.value;
-              onChange({
-                ...form,
-                sourceAmount,
-                allocableAmount: form.allocableAmount || sourceAmount,
-              });
-            }}
+            onChange={(event) => onChange(updateCostSourceAmount(form, event.target.value))}
             required
           />
         </label>

@@ -303,6 +303,24 @@ describe('Vorauszahlungen und Abrechnungsstatus', () => {
     ).toThrow(/nichtnegativer sicherer Centbetrag/);
   });
 
+  test.each(['2025-00', '2025-13'])(
+    'weist den ungültigen Vorauszahlungsmonat %s zurück',
+    (month) => {
+      expect(() =>
+        calculatePrepayments(
+          {
+            id: 1,
+            unitId: 1,
+            tenantName: 'A',
+            startDate: '2025-01-01',
+            prepayments: [{ fromMonth: month, monthlyCents: 10_000 }],
+          },
+          2025,
+        ),
+      ).toThrow(/Ungültiger Vorauszahlungsmonat/);
+    },
+  );
+
   test('Kosten anderer Kalenderjahre werden ignoriert', () => {
     const input = baseInput();
     input.costs.push(cost({ year: 2024 }));

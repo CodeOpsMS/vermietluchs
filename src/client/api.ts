@@ -1,3 +1,5 @@
+import { describeApiError, type ApiErrorPayload } from './api-error';
+
 export class ApiError extends Error {
   status: number;
 
@@ -23,20 +25,11 @@ export async function api<T>(path: string, request: JsonRequest = {}): Promise<T
 
   const response = await fetch(path, { ...request, headers, body });
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as {
-      error?: string;
-      message?: string;
-      details?: { currentRevision?: unknown };
-    } | null;
-    if (response.status === 409 && typeof payload?.details?.currentRevision === 'number') {
+    const payload = (await response.json().catch(() => null)) as ApiErrorPayload;
+    const { isRevisionConflict, message } = describeApiError(response.status, payload);
+    if (isRevisionConflict) {
       window.dispatchEvent(new Event(DATA_CONFLICT_EVENT));
     }
-    const serverMessage =
-      payload?.error ?? payload?.message ?? `Anfrage fehlgeschlagen (${response.status}).`;
-    const message =
-      response.status === 409
-        ? `${serverMessage} Bitte lade die Daten neu und wiederhole den Vorgang.`
-        : serverMessage;
     throw new ApiError(message, response.status);
   }
 

@@ -43,6 +43,8 @@ const settlementRowPayloadSchema = z
 
 export const settlementPayloadSchema = z
   .object({
+    // Fehlt bei alten Snapshots, deren interne Bezeichnungen beim Lesen neutralisiert werden.
+    payloadVersion: z.literal(2).optional(),
     propertyId: z.number().int().positive(),
     tenancyId: z.number().int().positive(),
     year: z.number().int().min(1900).max(2200),
@@ -138,6 +140,8 @@ function findSnapshot(
 
 function snapshotPayload(row: SnapshotRow) {
   const payload = settlementPayloadSchema.parse(JSON.parse(row.payload_json));
+  if (payload.payloadVersion === 2) return payload;
+
   const externalNames = payload.rows
     .filter((item) => !item.isRoundingDifference)
     .map((item) => ({
@@ -214,6 +218,7 @@ function buildPayload(
     result.costs.map((cost) => [String(cost.costId), cost]),
   );
   const content = {
+    payloadVersion: 2 as const,
     propertyId: input.propertyId,
     tenancyId: input.tenancyId,
     year: input.year,

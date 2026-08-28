@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import type { Request, RequestHandler } from 'express';
 import { z } from 'zod';
 import { ApiError } from './errors';
@@ -36,6 +37,37 @@ export function revisionFromIfMatch(request: Request): number {
     throw new ApiError(400, 'Der If-Match-Header enthält keine gültige Revision.');
   }
   return revision;
+}
+
+function normalizeHostname(value: string): string {
+  const candidate = value.trim().toLowerCase();
+  if (candidate.startsWith('[')) {
+    const closingBracket = candidate.indexOf(']');
+    return closingBracket > 0 ? candidate.slice(1, closingBracket) : candidate;
+  }
+  if (isIP(candidate)) return candidate;
+  return candidate.replace(/:\d+$/, '').replace(/\.$/, '');
+}
+
+/**
+ * Verhindert DNS-Rebinding: Browserzugriffe über localhost oder eine direkte
+ * IP-Adresse sind erlaubt, eigene DNS-Namen müssen ausdrücklich freigegeben sein.
+ */
+export function requireAllowedHost(configuredHosts: readonly string[] = []): RequestHandler {
+  const allowed = new Set(configuredHosts.map(normalizeHostname).filter(Boolean));
+  return (request, _response, next) => {
+    const hostname = normalizeHostname(request.get('host') ?? '');
+    if (hostname && (hostname === 'localhost' || isIP(hostname) || allowed.has(hostname))) {
+      next();
+      return;
+    }
+    next(
+      new ApiError(
+        421,
+        'Dieser Hostname ist nicht freigegeben. Nutze localhost, eine IP-Adresse oder VERMIETLUCHS_ALLOWED_HOSTS.',
+      ),
+    );
+  };
 }
 
 export const sameOriginWrites: RequestHandler = (request, _response, next) => {

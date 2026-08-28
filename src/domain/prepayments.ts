@@ -57,7 +57,7 @@ export function calculatePrepayments(tenancy: SettlementTenancy, year: number): 
   );
   const groups = [...STANDARD_GROUPS];
   for (const level of schedule) {
-    if (!/^\d{4}-\d{2}$/.test(level.fromMonth)) {
+    if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(level.fromMonth)) {
       throw new TypeError(`Ungültiger Vorauszahlungsmonat „${level.fromMonth}“.`);
     }
     if (!Number.isSafeInteger(level.monthlyCents) || level.monthlyCents < 0) {
