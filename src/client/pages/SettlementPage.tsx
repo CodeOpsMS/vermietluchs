@@ -93,6 +93,49 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
     };
   }, [propertyId]);
 
+  useEffect(() => {
+    if (!propertyId || !tenancyId || archiveLoading || correction !== null || preview !== null) {
+      return;
+    }
+    const matchingSnapshot = archive.find(
+      (item) => item.tenancyId === tenancyId && item.year === year,
+    );
+    if (!matchingSnapshot) return;
+
+    let cancelled = false;
+    void Promise.resolve().then(async () => {
+      if (!cancelled) {
+        setArchiveBusyId(matchingSnapshot.snapshotId);
+        setArchiveError('');
+      }
+      try {
+        const snapshot = await getJson<SettlementPreview>(
+          `/api/settlements/${matchingSnapshot.snapshotId}?propertyId=${propertyId}`,
+        );
+        if (!cancelled) {
+          setTenancyId(snapshot.tenancyId);
+          setPreview(snapshot);
+          setCorrection(null);
+          setError('');
+        }
+      } catch (reason) {
+        if (!cancelled) {
+          setArchiveError(
+            reason instanceof Error
+              ? reason.message
+              : 'Gespeicherte Abrechnung konnte nicht geöffnet werden.',
+          );
+        }
+      } finally {
+        setArchiveBusyId((current) => (current === matchingSnapshot.snapshotId ? null : current));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [archive, archiveLoading, correction, preview, propertyId, tenancyId, year]);
+
   async function refreshArchive(selectedPropertyId: number) {
     try {
       const result = await getJson<SettlementArchiveItem[]>(
@@ -287,7 +330,7 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
         eligibleTenancies={selectableTenancies}
         units={data.units}
         tenancyId={tenancyId}
-        loading={loading}
+        loading={loading || archiveBusyId !== null}
         hasPreview={preview !== null}
         onTenancyChange={changeTenancy}
         onCreatePreview={() => void createPreview()}
@@ -307,12 +350,15 @@ export default function SettlementPage({ data, propertyId, year }: PageProps) {
       )}
 
       {loading && <Loading label="Abrechnung wird centgenau berechnet …" />}
-      {!loading && !preview && eligibleTenancies.length === 0 && (
+      {!loading && archiveBusyId !== null && !preview && (
+        <Loading label="Gespeicherte Abrechnung wird geöffnet …" />
+      )}
+      {!loading && archiveBusyId === null && !preview && eligibleTenancies.length === 0 && (
         <EmptyState title="Kein Mietverhältnis im gewählten Jahr">
           Lege ein Mietverhältnis an oder wähle ein anderes Abrechnungsjahr.
         </EmptyState>
       )}
-      {!loading && !preview && eligibleTenancies.length > 0 && (
+      {!loading && archiveBusyId === null && !preview && eligibleTenancies.length > 0 && (
         <EmptyState
           title="Vorschau noch nicht berechnet"
           action={

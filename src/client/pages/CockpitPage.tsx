@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
 import type { PageProps } from '../App';
+import { getJson } from '../api';
 import { EmptyState, PageHeader, StatusPill } from '../components/Common';
 import { activeInYear, euro } from '../format';
+import type { SettlementArchiveItem } from './settlement/types';
 
 type PageId = 'properties' | 'costs' | 'meters' | 'rent' | 'settlement';
 
@@ -10,6 +13,44 @@ export default function CockpitPage({
   year,
   onNavigate,
 }: PageProps & { onNavigate: (page: PageId) => void }) {
+  const [settlements, setSettlements] = useState<SettlementArchiveItem[]>([]);
+  const [settlementStatus, setSettlementStatus] = useState<'loading' | 'ready' | 'error'>(
+    'loading',
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve().then(async () => {
+      if (!propertyId) {
+        if (!cancelled) {
+          setSettlements([]);
+          setSettlementStatus('ready');
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setSettlements([]);
+        setSettlementStatus('loading');
+      }
+      try {
+        const result = await getJson<SettlementArchiveItem[]>(
+          `/api/settlements?propertyId=${propertyId}&year=${year}`,
+        );
+        if (!cancelled) {
+          setSettlements(result);
+          setSettlementStatus('ready');
+        }
+      } catch {
+        if (!cancelled) setSettlementStatus('error');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [propertyId, year]);
+
   if (!propertyId) {
     return (
       <>
@@ -34,6 +75,12 @@ export default function CockpitPage({
   const activeTenancies = data.tenancies.filter((tenancy) =>
     activeInYear(tenancy.startDate, tenancy.endDate, year),
   );
+  const closedTenancyIds = new Set(settlements.map((settlement) => settlement.tenancyId));
+  const closedSettlementCount = activeTenancies.filter((tenancy) =>
+    closedTenancyIds.has(tenancy.id),
+  ).length;
+  const allSettlementsClosed =
+    activeTenancies.length > 0 && closedSettlementCount === activeTenancies.length;
   const yearCosts = data.costs.filter((cost) => cost.year === year);
   const included = yearCosts.filter((cost) => cost.tenantStatus === 'included');
   const pending = yearCosts.filter((cost) => cost.tenantStatus === 'pending');
@@ -81,8 +128,21 @@ export default function CockpitPage({
     },
     {
       label: 'Abrechnung',
-      detail: pending.length ? 'Nach Kostenprüfung möglich' : 'Vorschau ist bereit',
-      done: false,
+      detail:
+        settlementStatus === 'loading'
+          ? 'Abschlussstatus wird geladen'
+          : settlementStatus === 'error'
+            ? 'Abschlussstatus nicht verfügbar'
+            : allSettlementsClosed
+              ? `${closedSettlementCount} Abrechnung${closedSettlementCount === 1 ? '' : 'en'} abgeschlossen`
+              : closedSettlementCount > 0
+                ? `${closedSettlementCount} von ${activeTenancies.length} Abrechnungen abgeschlossen`
+                : pending.length
+                  ? 'Nach Kostenprüfung möglich'
+                  : activeTenancies.length === 0
+                    ? 'Kein Mietverhältnis im gewählten Jahr'
+                    : 'Vorschau ist bereit',
+      done: allSettlementsClosed,
       page: 'settlement' as PageId,
     },
   ];

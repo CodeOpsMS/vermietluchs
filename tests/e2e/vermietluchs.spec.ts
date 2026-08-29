@@ -513,11 +513,17 @@ test.describe('Vermietluchs-Oberfläche', () => {
     );
     await expect(page.getByText('Diese Abrechnung ist abgeschlossen.')).toBeVisible();
     await navigate(page, 'Cockpit', 'Cockpit 2024');
+    const settlementTask = page.locator('.task-list > button').filter({ hasText: 'Abrechnung' });
+    await expect(settlementTask.locator('.task-index')).toHaveText('✓');
+    await expect(settlementTask).toContainText('1 Abrechnung abgeschlossen');
     await navigate(page, 'Abrechnung', 'Abrechnung 2024');
     const archiveItem = page.locator('.archive-list > div').filter({
       hasText: '2024 · Demo Mieter Januar–Juli',
     });
-    await archiveItem.getByRole('button', { name: 'Öffnen', exact: true }).click();
+    await expect(archiveItem.getByRole('button', { name: 'Geöffnet', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Vorschau noch nicht berechnet' })).toHaveCount(
+      0,
+    );
     await expect(page.getByRole('button', { name: 'Geöffnet', exact: true })).toBeVisible();
     await expect(page.locator('.settlement-paper')).toContainText(/119,69\s*€/);
     await expect(pageErrors).toEqual([]);
