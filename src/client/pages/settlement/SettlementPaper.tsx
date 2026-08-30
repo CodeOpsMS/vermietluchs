@@ -1,4 +1,4 @@
-import { dateDe, euro } from '../../format';
+import { dateDe, euro, textDatesDe } from '../../format';
 import type { SettlementPreview } from '../../types';
 import { createTenantStatementGroups } from './settlement-groups';
 
@@ -23,9 +23,19 @@ function getPrepaymentEntries(preview: SettlementPreview): Array<[string, number
   ].filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] !== 0);
 }
 
+function isIncompleteMeterCoverageWarning(warning: string): boolean {
+  return (
+    warning.startsWith('Zähler „') &&
+    warning.includes('ist nicht vollständig durch Ablesungen abgedeckt.')
+  );
+}
+
 export default function SettlementPaper({ preview }: SettlementPaperProps) {
   const groups = createTenantStatementGroups(preview.rows);
   const prepaymentEntries = getPrepaymentEntries(preview);
+  const printableWarnings = preview.warnings.filter(
+    (warning) => !isIncompleteMeterCoverageWarning(warning),
+  );
 
   return (
     <article className="settlement-paper">
@@ -72,14 +82,14 @@ export default function SettlementPaper({ preview }: SettlementPaperProps) {
         <div className="print-warnings print-blocking">
           <strong>Offene Prüfpunkte</strong>
           {preview.blockingReasons.map((reason) => (
-            <p key={reason}>{reason}</p>
+            <p key={reason}>{textDatesDe(reason)}</p>
           ))}
         </div>
       )}
-      {preview.warnings.length > 0 && (
+      {printableWarnings.length > 0 && (
         <div className="print-warnings">
-          {preview.warnings.map((warning) => (
-            <p key={warning}>{warning}</p>
+          {printableWarnings.map((warning) => (
+            <p key={warning}>{textDatesDe(warning)}</p>
           ))}
         </div>
       )}
@@ -88,7 +98,7 @@ export default function SettlementPaper({ preview }: SettlementPaperProps) {
           <strong>Hinweise zur Berechnung</strong>
           <ul>
             {preview.notes.map((note) => (
-              <li key={note}>{note}</li>
+              <li key={note}>{textDatesDe(note)}</li>
             ))}
           </ul>
         </div>
