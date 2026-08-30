@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { downloadBackup, getJson, importBackup, putJson } from '../api';
+import { downloadBackup, getJson, importBackup, postJson, putJson } from '../api';
+import { AI_PROVIDER_DEFAULTS } from '../../shared/ai';
 import { ErrorBox, Loading, Notice, PageHeader } from '../components/Common';
-import type { Settings } from '../types';
+import type { AiProvider, AiSettings, Settings } from '../types';
 
 export default function SettingsPage({ reload }: { reload: () => Promise<void> }) {
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [clearApiKey, setClearApiKey] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -13,7 +17,12 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
   async function load() {
     setError('');
     try {
-      setSettings(await getJson<Settings>('/api/settings'));
+      const [loadedSettings, loadedAiSettings] = await Promise.all([
+        getJson<Settings>('/api/settings'),
+        getJson<AiSettings>('/api/ai/settings'),
+      ]);
+      setSettings(loadedSettings);
+      setAiSettings(loadedAiSettings);
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : 'Einstellungen konnten nicht geladen werden.',
@@ -39,6 +48,60 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
     } finally {
       setBusy(false);
     }
+  }
+
+  async function saveAi(testAfterSave = false) {
+    if (!aiSettings) return;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const saved = await putJson<AiSettings>('/api/ai/settings', {
+        enabled: aiSettings.enabled,
+        provider: aiSettings.provider,
+        model: aiSettings.model,
+        baseUrl: aiSettings.baseUrl,
+        apiKey: apiKey.trim() || undefined,
+        clearApiKey,
+        revision: aiSettings.revision,
+      });
+      setAiSettings(saved);
+      setApiKey('');
+      setClearApiKey(false);
+      await reload();
+      if (testAfterSave) {
+        const result = await postJson<{ ok: true; message: string }>('/api/ai/test', {
+          provider: saved.provider,
+          model: saved.model,
+          baseUrl: saved.baseUrl,
+        });
+        setMessage(result.message);
+      } else {
+        setMessage('KI-Einstellungen gespeichert.');
+      }
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'KI-Einstellungen konnten nicht gespeichert werden.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function selectProvider(provider: AiProvider) {
+    if (!aiSettings) return;
+    const defaults = AI_PROVIDER_DEFAULTS[provider];
+    setAiSettings({
+      ...aiSettings,
+      provider,
+      model: defaults.model,
+      baseUrl: defaults.baseUrl,
+      apiKeyConfigured: false,
+    });
+    setApiKey('');
+    setClearApiKey(false);
   }
 
   async function restore(file: File) {
@@ -76,9 +139,9 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
       />
       {error && <ErrorBox message={error} onRetry={() => void load()} />}
       {message && <Notice kind="success">{message}</Notice>}
-      {!settings && !error && <Loading />}
+      {(!settings || !aiSettings) && !error && <Loading />}
 
-      {settings && (
+      {settings && aiSettings && (
         <div className="settings-grid">
           <section className="card">
             <div className="section-heading">
@@ -154,6 +217,133 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
           </section>
 
           <div className="settings-side">
+            <section className="card ai-settings-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Optional · KI-Unterstützung</p>
+                  <h2>KI-Scan</h2>
+                </div>
+                <label className="toggle-field">
+                  <input
+                    type="checkbox"
+                    aria-label="KI-Scan aktivieren"
+                    checked={aiSettings.enabled}
+                    onChange={(event) =>
+                      setAiSettings({ ...aiSettings, enabled: event.target.checked })
+                    }
+                  />
+                  <span>{aiSettings.enabled ? 'Aktiv' : 'Aus'}</span>
+                </label>
+              </div>
+              <p className="section-copy">
+                Liest Kosten und Zählerstände aus PDFs als prüfbaren Entwurf. Mieter,
+                Mietverhältnisse und Abrechnungen werden nie durch die KI angelegt.
+              </p>
+              <form
+                className="form-grid"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void saveAi(false);
+                }}
+              >
+                <label className="field span-2">
+                  Anbieter
+                  <select
+                    value={aiSettings.provider}
+                    onChange={(event) => selectProvider(event.target.value as AiProvider)}
+                  >
+                    <option value="ollama">Ollama · lokal</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="mistral">Mistral / Mixtral</option>
+                  </select>
+                </label>
+                <label className="field span-2">
+                  Modell
+                  <input
+                    value={aiSettings.model}
+                    onChange={(event) =>
+                      setAiSettings({ ...aiSettings, model: event.target.value })
+                    }
+                    placeholder={AI_PROVIDER_DEFAULTS[aiSettings.provider].model}
+                  />
+                </label>
+                <label className="field span-2">
+                  API-Adresse
+                  <input
+                    value={aiSettings.baseUrl}
+                    readOnly={aiSettings.provider !== 'ollama'}
+                    onChange={(event) =>
+                      setAiSettings({ ...aiSettings, baseUrl: event.target.value })
+                    }
+                  />
+                  <small>
+                    {aiSettings.provider === 'ollama'
+                      ? 'Im Docker-Container meist http://host.docker.internal:11434 oder eine private LAN-IP.'
+                      : 'Cloud-Endpunkte sind zum Schutz von Schlüssel und PDF fest vorgegeben.'}
+                  </small>
+                </label>
+                {aiSettings.provider !== 'ollama' && (
+                  <label className="field span-2">
+                    API-Schlüssel
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={apiKey}
+                      onChange={(event) => {
+                        setApiKey(event.target.value);
+                        if (event.target.value) setClearApiKey(false);
+                      }}
+                      placeholder={
+                        aiSettings.apiKeyConfigured
+                          ? 'Schlüssel gespeichert · leer lassen zum Beibehalten'
+                          : 'API-Schlüssel eintragen'
+                      }
+                    />
+                    <small>
+                      Separat mit Dateirechten 0600 gespeichert; nicht in SQLite, API-Antworten oder
+                      JSON-Backups enthalten.
+                    </small>
+                  </label>
+                )}
+                {aiSettings.provider !== 'ollama' && aiSettings.apiKeyConfigured && (
+                  <label className="check-field span-2">
+                    <input
+                      type="checkbox"
+                      checked={clearApiKey}
+                      onChange={(event) => setClearApiKey(event.target.checked)}
+                    />
+                    Gespeicherten Schlüssel beim Speichern löschen
+                  </label>
+                )}
+                <div className="ai-privacy-note span-2">
+                  {aiSettings.provider === 'ollama' ? (
+                    <>
+                      <strong>Lokale Verarbeitung:</strong> PDF-Inhalt bleibt bei deiner
+                      Ollama-Instanz.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Cloud-Verarbeitung:</strong> PDFs werden zur Analyse an den gewählten
+                      Anbieter übertragen. Dessen Datenschutz- und Aufbewahrungsregeln gelten.
+                    </>
+                  )}
+                </div>
+                <div className="form-actions span-2 ai-settings-actions">
+                  <button
+                    className="btn btn-secondary"
+                    disabled={busy}
+                    type="button"
+                    onClick={() => void saveAi(true)}
+                  >
+                    {busy ? 'Prüft …' : 'Speichern & Verbindung testen'}
+                  </button>
+                  <button className="btn btn-primary" disabled={busy} type="submit">
+                    {busy ? 'Speichert …' : 'KI-Einstellungen speichern'}
+                  </button>
+                </div>
+              </form>
+            </section>
+
             <section className="card backup-card">
               <div className="section-heading">
                 <div>

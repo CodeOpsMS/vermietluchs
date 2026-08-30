@@ -74,7 +74,7 @@ describe('HTTP-API und SQLite-Persistenz', () => {
 
   test('Migration, Health-Route und Foreign Keys sind aktiv', async () => {
     const health = await request(app).get('/api/health').expect(200);
-    expect(health.body).toEqual({ ok: true, database: ['ok'], schemaVersion: 1 });
+    expect(health.body).toEqual({ ok: true, database: ['ok'], schemaVersion: 2 });
     expect(health.headers['cache-control']).toBe('no-store');
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
     expect(db.pragma('journal_mode', { simple: true })).toBe('wal');

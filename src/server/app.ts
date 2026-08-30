@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
+import { createAiProviderService, type AiProviderService } from './ai/providers';
+import { registerAiRoutes } from './ai/routes';
+import { createMemoryAiSecretStore, type AiSecretStore } from './ai/secrets';
 import type { SqliteDatabase } from './database';
 import { registerBackupRoutes } from './backup';
 import { registerChangeoverRoute } from './changeovers';
@@ -19,6 +22,8 @@ export type AppOptions = {
   staticDir?: string;
   settlementCalculator?: SettlementCalculator | null;
   allowedHosts?: string[];
+  aiSecretStore?: AiSecretStore;
+  aiProviderService?: AiProviderService;
 };
 
 export function createApp(options: AppOptions) {
@@ -61,6 +66,10 @@ export function createApp(options: AppOptions) {
   });
   api.use(sameOriginWrites);
   registerSettingsRoutes(api, options.db);
+  registerAiRoutes(api, options.db, {
+    secretStore: options.aiSecretStore ?? createMemoryAiSecretStore(),
+    service: options.aiProviderService ?? createAiProviderService(),
+  });
   registerResourceRoutes(api, options.db);
   registerPaymentGenerationRoute(api, options.db);
   registerChangeoverRoute(api, options.db);

@@ -551,4 +551,37 @@ test.describe('Vermietluchs-Oberfläche', () => {
       ),
     ).toBe(true);
   });
+
+  test('KI-Scan erscheint erst nach bewusster Aktivierung', async ({ page }) => {
+    const currentResponse = await page.request.get('/api/ai/settings');
+    const current = (await currentResponse.json()) as {
+      enabled: boolean;
+      provider: string;
+      model: string;
+      baseUrl: string;
+      revision: number;
+    };
+    if (current.enabled) {
+      await sendJson(page.request, 'put', '/api/ai/settings', {
+        enabled: false,
+        provider: current.provider,
+        model: current.model,
+        baseUrl: current.baseUrl,
+        clearApiKey: false,
+        revision: current.revision,
+      });
+    }
+
+    await page.goto('/');
+    const navigation = page.getByRole('navigation', { name: 'Hauptnavigation' });
+    await expect(navigation.getByRole('button', { name: 'KI-Scan', exact: true })).toHaveCount(0);
+    await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
+    await page.getByRole('checkbox', { name: 'KI-Scan aktivieren', exact: true }).check();
+    await page.getByRole('button', { name: 'KI-Einstellungen speichern', exact: true }).click();
+    await expect(page.getByText('KI-Einstellungen gespeichert.')).toBeVisible();
+    await expect(navigation.getByRole('button', { name: 'KI-Scan', exact: true })).toBeVisible();
+    await navigate(page, 'KI-Scan', /^KI-Scan \d{4}$/);
+    await expect(page.getByRole('button', { name: 'PDF auswählen', exact: true })).toBeVisible();
+    await expect(page.getByText(/prüfbaren Entwurf einlesen/)).toBeVisible();
+  });
 });

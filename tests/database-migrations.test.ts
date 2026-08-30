@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { runMigrations, type SqliteDatabase } from '../src/server/database';
+import { openDatabase, runMigrations, type SqliteDatabase } from '../src/server/database';
 
 describe('Datenbankmigrationen', () => {
   let directory: string;
@@ -78,6 +78,33 @@ describe('Datenbankmigrationen', () => {
 
     expect(db.prepare('SELECT count(*) AS total FROM schema_migrations').get()).toEqual({
       total: 1,
+    });
+  });
+
+  test('ergänzt KI-Einstellungen in einer bestehenden Datenbank ohne Fachdaten zu verändern', () => {
+    db.close();
+    const oldMigrations = path.join(directory, 'old-migrations');
+    fs.mkdirSync(oldMigrations);
+    fs.copyFileSync(
+      path.resolve('migrations/001_initial.sql'),
+      path.join(oldMigrations, '001_initial.sql'),
+    );
+    const filename = path.join(directory, 'existing.sqlite');
+    db = openDatabase(filename, { migrationsDir: oldMigrations });
+    db.prepare("INSERT INTO properties (name, address) VALUES ('Bleibt', 'Musterweg 1')").run();
+    db.close();
+
+    db = openDatabase(filename, { migrationsDir: path.resolve('migrations') });
+
+    expect(db.prepare('SELECT name, address FROM properties').all()).toEqual([
+      { name: 'Bleibt', address: 'Musterweg 1' },
+    ]);
+    expect(db.prepare('SELECT enabled, provider FROM ai_settings WHERE id = 1').get()).toEqual({
+      enabled: 0,
+      provider: 'ollama',
+    });
+    expect(db.prepare('SELECT max(version) AS version FROM schema_migrations').get()).toEqual({
+      version: 2,
     });
   });
 });

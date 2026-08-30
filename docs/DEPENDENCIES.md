@@ -1,6 +1,6 @@
 # Abhängigkeiten
 
-Stand: 27. August 2026. Maßgeblich für reproduzierbare Installationen ist die
+Stand: 30. August 2026. Maßgeblich für reproduzierbare Installationen ist die
 eingecheckte `package-lock.json`; alle direkten Versionen sind exakt festgelegt.
 
 ## Laufzeit und Datenfluss
@@ -10,6 +10,7 @@ Browser
   └─ React 19 → REST/JSON
                  └─ Express 5 → Zod 3 → Fachlogik
                                              └─ better-sqlite3 13 → SQLite-Datei
+                 └─ optionaler KI-Scan → OpenAI / Mistral / lokales Ollama
 ```
 
 | Paket                | Version | Aufgabe                                            |
@@ -18,10 +19,12 @@ Browser
 | `express`            |   5.2.1 | HTTP-API und Auslieferung des gebauten Clients     |
 | `zod`                | 3.25.67 | Validierung gemeinsamer API-Eingaben und Snapshots |
 | `better-sqlite3`     |  13.0.3 | Synchroner, nativer Zugriff auf SQLite             |
+| `pdf-parse`          |   2.4.5 | Lokale PDF-Text- und Seitenextraktion für Ollama   |
 
 Der Produktionscontainer benötigt Node.js 24, Linux und ein beschreibbares
-Volume unter `/data`. Es gibt keine externe Datenbank, Telemetrie oder
-Cloud-Laufzeitabhängigkeit.
+Volume unter `/data`. Es gibt keine externe Datenbank oder Telemetrie. Nur bei
+bewusst aktiviertem OpenAI- oder Mistral-Scan besteht eine
+Cloud-Laufzeitabhängigkeit; Ollama kann vollständig lokal laufen.
 
 ## Entwicklungs- und Build-Werkzeuge
 
@@ -34,9 +37,8 @@ Cloud-Laufzeitabhängigkeit.
 - Prettier, ESLint und die React-Lint-Plugins erzwingen den Stil.
 - Docker Buildx erzeugt die Linux-Images für AMD64 und ARM64.
 
-`npm audit` erfasst 416 Abhängigkeiten insgesamt: 75 für die Produktion, 342 für
-die Entwicklung und 54 optionale beziehungsweise plattformabhängige
-Abhängigkeiten; die Kategorien können sich überschneiden. Der Audit vom 27. August 2026 meldet keine bekannte Schwachstelle.
+Der Audit vom 30. August 2026 meldet für die eingecheckte Lockdatei keine
+bekannte Schwachstelle.
 
 `@vitest/coverage-v8` ist mit `3.2.7` exakt an die eingesetzte Vitest-Version
 gebunden. Diese Linie zieht nur für die Entwicklung noch eine als veraltet

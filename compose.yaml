@@ -6,6 +6,8 @@ services:
     restart: unless-stopped
     ports:
       - '3001:3001'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     environment:
       VERMIETLUCHS_PORT: '3001'
       VERMIETLUCHS_HOST: 0.0.0.0

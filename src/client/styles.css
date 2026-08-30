@@ -1467,6 +1467,40 @@ legend {
   gap: 22px;
   align-content: start;
 }
+.settings-side > .card {
+  margin: 0;
+}
+.toggle-field,
+.check-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+.toggle-field input,
+.check-field input,
+.ai-select-row input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--ochre);
+}
+.ai-privacy-note {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  background: var(--surface-muted);
+}
+.ai-settings-actions {
+  flex-wrap: wrap;
+}
+.ai-settings-actions .btn {
+  flex: 1;
+}
 .backup-card {
   margin: 0;
 }
@@ -1534,6 +1568,81 @@ legend {
   font-size: 1.3rem;
   font-weight: 900;
   background: #b9473e;
+}
+
+.ai-drop-zone {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 34px 20px;
+  border: 2px dashed var(--control-line);
+  border-radius: 14px;
+  text-align: center;
+  background: var(--surface-translucent);
+}
+.ai-drop-zone .empty-mark {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: var(--ochre-dark);
+  font-size: 1.35rem;
+  font-weight: 900;
+  background: var(--ochre-pale);
+}
+.ai-drop-zone small {
+  margin-bottom: 5px;
+  color: var(--muted);
+}
+.ai-upload-card > .form-actions,
+.ai-review-card > .form-actions {
+  justify-content: space-between;
+  align-items: center;
+}
+.ai-upload-card > .form-actions small,
+.ai-review-card > .form-actions small {
+  color: var(--muted);
+}
+.ai-review-card > h3 {
+  margin: 28px 0 12px;
+}
+.ai-proposal-list {
+  display: grid;
+  gap: 12px;
+}
+.ai-proposal-list article {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.ai-proposal-list article.selected {
+  border-color: var(--ochre);
+  box-shadow: inset 3px 0 var(--ochre);
+}
+.ai-select-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+.ai-select-row span {
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+.ai-proposal-list article > .form-grid {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.ai-proposal-list article > footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--muted);
 }
 
 .mobile-scrim {

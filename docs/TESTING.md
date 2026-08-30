@@ -1,7 +1,8 @@
 # Teststrategie
 
-Stand: 28. August 2026. Die Suite umfasst 21 Vitest-Dateien mit 192 Tests, zwei
-Chromium-End-to-End-Szenarien und zwei Tests des gebauten Container-Images.
+Stand: 30. August 2026. Die Suite umfasst zusätzlich gezielte Tests der
+KI-Provider, Sicherheitsgrenzen und des transaktionalen Imports sowie ein
+Chromium-Szenario für die optionale Navigation.
 
 ## Prüfungen
 
@@ -11,6 +12,7 @@ Chromium-End-to-End-Szenarien und zwei Tests des gebauten Container-Images.
 | Integrations- und API-Tests | Express, SQLite, Migrationen, Backups, Konflikte und HTTP-Schutz       | `npm test`              |
 | Coverage                    | gesamter TypeScript-/TSX-Quelltext und strengere Kernschichten         | `npm run test:coverage` |
 | Browser                     | wichtigster Arbeitsablauf mit temporärer Datenbank in Chromium         | `npm run test:e2e`      |
+| KI-Grenzen                  | Providerformat, Schlüssel, Ziele, Entwurf und atomarer Import          | `npm run test:ai`       |
 | Container-Image             | leere Datenbank und reproduzierbare Beispieldaten für 2023             | siehe unten             |
 | vollständige Commit-Prüfung | Format, Typen, Lint, Coverage-Tests und Build                          | `npm run check`         |
 
@@ -64,6 +66,9 @@ Schranke besitzt.
   Idempotenz.
 - `http-infrastructure.test.ts`: Host-Allowlist, JSON-Fehler und fehlerhafter
   SQLite-Healthcheck.
+- `ai*.test.ts`: feste Cloud-Ziele, private Ollama-Ziele, Schlüsselschutz,
+  Providerpayloads, deaktivierter Standardzustand und atomarer Import ohne
+  Mieter oder Abrechnungen.
 
 Ein Fehlerfix sollte zuerst durch einen kleinen Test reproduziert werden. Der
 Test bleibt anschließend als Regression bestehen. Zeit, Zufall, Netzwerk und

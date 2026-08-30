@@ -48,7 +48,28 @@ async function readBackup(): Promise<Backup> {
   assert.equal(backup.schemaVersion, 1);
   assert.equal(backup.app, 'Vermietluchs');
   assert.equal(backup.tables.app_settings.length, 1);
+  assert.equal(
+    backup.tables.ai_settings,
+    undefined,
+    'KI-Konfiguration darf nicht im Backup liegen',
+  );
   return backup;
+}
+
+async function assertAiDisabledByDefault(): Promise<void> {
+  const settings = await json<{
+    enabled: boolean;
+    provider: string;
+    apiKeyConfigured: boolean;
+  }>('/api/ai/settings');
+  assert.deepEqual(
+    {
+      enabled: settings.enabled,
+      provider: settings.provider,
+      apiKeyConfigured: settings.apiKeyConfigured,
+    },
+    { enabled: false, provider: 'ollama', apiKeyConfigured: false },
+  );
 }
 
 async function assertEmptyDatabase(): Promise<void> {
@@ -174,8 +195,9 @@ async function assertExampleDatabase(): Promise<void> {
 const health = await json<{ ok: boolean; database: string[]; schemaVersion: number }>(
   '/api/health',
 );
-assert.deepEqual(health, { ok: true, database: ['ok'], schemaVersion: 1 });
+assert.deepEqual(health, { ok: true, database: ['ok'], schemaVersion: 2 });
 
+await assertAiDisabledByDefault();
 await assertEmptyDatabase();
 if (mode === 'example') {
   await seedExampleData();
