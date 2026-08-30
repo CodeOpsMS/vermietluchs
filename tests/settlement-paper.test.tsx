@@ -110,6 +110,31 @@ describe('Schlichte Abrechnungs-Druckansicht', () => {
     expect(html).not.toContain('Interne Müllrechnung');
   });
 
+  test('druckt deutsche Datumsangaben und keine Warnungen über fehlende Zählerabdeckung', () => {
+    const html = renderToStaticMarkup(
+      <SettlementPaper
+        preview={{
+          ...preview,
+          notes: [
+            'Teiljahresabrechnung 2024-08-01 bis 2024-12-31 (153/366 Tage).',
+            'Für ein Teiljahr wird keine automatische 1/12-Empfehlung zur Vorauszahlung berechnet.',
+          ],
+          warnings: [
+            'Zähler „Wärmezähler F“: Der Zeitraum 2024-01-01 bis 2024-12-31 ist nicht vollständig durch Ablesungen abgedeckt.',
+            'Bitte den Wert vom 2024-12-31 fachlich prüfen.',
+          ],
+        }}
+      />,
+    );
+
+    expect(html).not.toContain('Wärmezähler F');
+    expect(html).not.toContain('nicht vollständig durch Ablesungen abgedeckt');
+    expect(html).toContain('Teiljahresabrechnung 01.08.2024 bis 31.12.2024');
+    expect(html).toContain('Bitte den Wert vom 31.12.2024 fachlich prüfen.');
+    expect(html).not.toContain('2024-08-01');
+    expect(html).not.toContain('2024-12-31');
+  });
+
   test('bietet den PDF-Druck nur für einen abgeschlossenen Stand an', () => {
     const callbacks = {
       onPrint: () => undefined,
