@@ -1,4 +1,5 @@
 import { Notice } from '../../components/Common';
+import { textDatesDe } from '../../format';
 import type { SettlementPreview } from '../../types';
 
 type SettlementNoticesProps = {
@@ -49,7 +50,7 @@ export default function SettlementNotices({
           <strong>Abschluss noch nicht möglich:</strong>
           <ul>
             {preview?.blockingReasons.map((reason) => (
-              <li key={reason}>{reason}</li>
+              <li key={reason}>{textDatesDe(reason)}</li>
             ))}
           </ul>
         </Notice>
@@ -59,7 +60,7 @@ export default function SettlementNotices({
           <strong>Bitte vor dem Abschluss prüfen:</strong>
           <ul>
             {preview?.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
+              <li key={warning}>{textDatesDe(warning)}</li>
             ))}
           </ul>
         </Notice>
@@ -69,7 +70,7 @@ export default function SettlementNotices({
           <strong>Hinweise zur Berechnung:</strong>
           <ul>
             {preview?.notes.map((note) => (
-              <li key={note}>{note}</li>
+              <li key={note}>{textDatesDe(note)}</li>
             ))}
           </ul>
         </Notice>

@@ -483,6 +483,12 @@ test.describe('Vermietluchs-Oberfläche', () => {
     await expect(page.getByLabel('Mietverhältnis')).toBeEnabled();
     await expect(paper).toContainText('Manfred Lämmerzahl');
     await expect(paper).toContainText('Demo Mieter Januar–Juli');
+    await expect(paper).toContainText('Teiljahresabrechnung 01.01.2024 bis 31.07.2024');
+    await expect(paper).not.toContainText('nicht vollständig durch Ablesungen abgedeckt');
+    await expect(paper).not.toContainText('2024-01-01');
+    await expect(
+      page.locator('.alert').filter({ hasText: 'Bitte vor dem Abschluss prüfen' }),
+    ).toContainText('nicht vollständig durch Ablesungen abgedeckt');
     await expect(paper).toContainText(/1\.102,70\s*€/);
     await expect(paper).toContainText(/4,99\s*€/);
     await expect(paper).toContainText(/62,00\s*€/);

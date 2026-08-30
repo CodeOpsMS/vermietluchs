@@ -7,6 +7,7 @@ import {
   isoDateToGermanInput,
   number,
   parseGermanNumber,
+  textDatesDe,
   today,
 } from '../src/client/format';
 
@@ -40,6 +41,13 @@ describe('Deutsche Datumseingabe', () => {
     expect(dateDe('2024-07-31')).toBe('31.07.2024');
     expect(dateDe(null)).toBe('—');
     expect(dateDe('fremdes-format')).toBe('fremdes-format');
+  });
+
+  test('formatiert Datumsangaben in gespeicherten Hinweistexten', () => {
+    expect(textDatesDe('Teiljahresabrechnung 2024-08-01 bis 2024-12-31 (153/366 Tage).')).toBe(
+      'Teiljahresabrechnung 01.08.2024 bis 31.12.2024 (153/366 Tage).',
+    );
+    expect(textDatesDe('Text ohne Datum')).toBe('Text ohne Datum');
   });
 
   test('ermittelt das lokale heutige Datum ohne UTC-Verschiebung', () => {

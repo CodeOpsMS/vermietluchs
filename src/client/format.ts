@@ -29,6 +29,11 @@ export function dateDe(value: string | null | undefined): string {
   return year && month && day ? `${day}.${month}.${year}` : value;
 }
 
+/** Formatiert ISO-Datumsangaben in bereits gespeicherten Hinweisen für die deutsche Anzeige. */
+export function textDatesDe(value: string): string {
+  return value.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (date) => dateDe(date));
+}
+
 /** Wandelt ein gespeichertes ISO-Datum in die deutsche Formulareingabe um. */
 export function isoDateToGermanInput(value: string | null | undefined): string {
   if (!value) return '';
