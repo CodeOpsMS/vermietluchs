@@ -962,6 +962,158 @@ code {
   background: var(--selected-bg);
   cursor: default;
 }
+.plan-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: end;
+}
+.plan-controls .field {
+  width: min(520px, 100%);
+}
+.plan-controls > small {
+  max-width: 420px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.plan-form-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--warm-line);
+  border-radius: 10px;
+  background: var(--warn-bg);
+}
+.plan-form-preview span {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.plan-form-preview strong {
+  color: var(--accent-number);
+  font-size: 1.15rem;
+}
+.operating-cost-plan-paper {
+  max-width: 900px;
+  margin-inline: auto;
+  padding: clamp(24px, 5vw, 48px);
+}
+.plan-document-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  gap: 32px;
+  padding-bottom: 28px;
+  border-bottom: 2px solid var(--navy);
+}
+.plan-document-header h2 {
+  margin: 0;
+  font-size: clamp(1.55rem, 3.5vw, 2.35rem);
+  letter-spacing: -0.035em;
+}
+.plan-document-header dl,
+.plan-costs dl,
+.plan-totals dl {
+  margin: 0;
+}
+.plan-document-header dl {
+  display: grid;
+  gap: 8px;
+}
+.plan-document-header dl div,
+.plan-costs dl div,
+.plan-totals dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+.plan-document-header dt,
+.plan-prepayment small {
+  color: var(--muted);
+}
+.plan-document-header dd,
+.plan-costs dd,
+.plan-totals dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.plan-costs {
+  padding: 30px 0 22px;
+}
+.plan-costs h3,
+.plan-notes h3 {
+  margin-bottom: 14px;
+  font-size: 1rem;
+}
+.plan-costs dl {
+  display: grid;
+  gap: 2px;
+}
+.plan-costs dl div {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.plan-costs dd {
+  color: var(--accent-number);
+  font-weight: 850;
+}
+.plan-totals {
+  padding: 20px;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--navy);
+}
+.plan-totals dl {
+  display: grid;
+  gap: 11px;
+}
+.plan-totals div:last-child {
+  padding-top: 11px;
+  border-top: 1px solid rgb(255 255 255 / 22%);
+  font-weight: 850;
+}
+.plan-totals dd {
+  color: var(--accent-number-on-dark);
+  font-weight: 850;
+}
+.plan-prepayment {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid var(--warm-line);
+  border-radius: 12px;
+  background: var(--warn-bg);
+}
+.plan-prepayment > span {
+  color: var(--ochre-dark);
+  font-size: 2rem;
+  font-weight: 850;
+}
+.plan-prepayment > div {
+  display: grid;
+  gap: 3px;
+}
+.plan-prepayment strong {
+  color: var(--accent-number);
+  font-size: clamp(1.35rem, 3vw, 1.85rem);
+  font-variant-numeric: tabular-nums;
+}
+.plan-notes {
+  margin-top: 26px;
+}
+.plan-notes p {
+  white-space: pre-wrap;
+}
+.plan-delete {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 900px;
+  margin: -8px auto 22px;
+}
 .field small {
   font-weight: 500;
   line-height: 1.4;
@@ -1669,6 +1821,17 @@ legend {
   .form-grid {
     grid-template-columns: 1fr;
   }
+  .plan-controls,
+  .plan-document-header {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .plan-form-preview {
+    grid-template-columns: 1fr;
+  }
+  .plan-controls > small {
+    max-width: none;
+  }
   .span-2 {
     grid-column: auto;
   }
@@ -1771,7 +1934,7 @@ legend {
   .alert,
   .empty-state,
   .loading,
-  .card:not(.settlement-paper) {
+  .card:not(.settlement-paper):not(.operating-cost-plan-paper) {
     display: none !important;
   }
   .app-shell,
@@ -1790,6 +1953,36 @@ legend {
     color: #111;
     background: #fff;
     box-shadow: none;
+  }
+  .operating-cost-plan-paper {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: #111;
+    background: #fff;
+    box-shadow: none;
+  }
+  .plan-document-header,
+  .plan-costs,
+  .plan-totals,
+  .plan-prepayment,
+  .plan-notes {
+    break-inside: avoid;
+  }
+  .plan-totals {
+    border: 1px solid #555;
+    color: #111;
+    background: #fff;
+  }
+  .plan-totals dd,
+  .plan-prepayment strong,
+  .plan-costs dd {
+    color: #111;
+  }
+  .plan-prepayment {
+    border-color: #777;
+    background: #fff;
   }
   .statement-group,
   .tax-note,

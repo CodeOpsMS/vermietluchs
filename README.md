@@ -22,6 +22,7 @@ Jahren Programmiererfahrung gut nachvollziehbar bleibt.
 - Zählerstände und bei Bedarf nachvollziehbare Interpolationen verwenden
 - Soll- und Ist-Zahlungen getrennt nach Kaltmiete, Nebenkosten und Garage führen
 - Abrechnungen prüfen, unveränderlich abschließen und im Browser drucken
+- Betriebskosten-Wirtschaftspläne für das Folgejahr nach Wohnung, Garage und Grundsteuer erfassen, monatlich umrechnen und drucken
 - alle Daten als JSON sichern und transaktional wiederherstellen
 
 ## Schnellstart mit Docker
@@ -128,6 +129,8 @@ Artefakt. Details und die geltenden Grenzwerte stehen in
    dort als Warnung gezeigt und verhindern den Abschluss.
 7. Die fertige Abrechnung abschließen und über den Browser drucken oder als PDF
    speichern.
+8. Unter **Wirtschaftsplan** die Vorgaben für das Folgejahr erfassen und die
+   festgelegte monatliche Vorauszahlung dokumentieren.
 
 Ein Abschluss speichert eine unveränderliche Momentaufnahme. Spätere Änderungen
 an Stammdaten verändern eine bereits abgeschlossene Abrechnung nicht. Über

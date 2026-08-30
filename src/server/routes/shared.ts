@@ -5,7 +5,14 @@ export type DatabaseRow = Record<string, unknown>;
 export type DatabaseValues = Record<string, string | number | null>;
 
 export type ResourceTable =
-  'properties' | 'units' | 'tenancies' | 'costs' | 'meters' | 'readings' | 'payments';
+  | 'properties'
+  | 'units'
+  | 'tenancies'
+  | 'costs'
+  | 'meters'
+  | 'readings'
+  | 'payments'
+  | 'operating_cost_plans';
 
 /**
  * Diese vier Felder haben alle fachlichen Datensätze gemeinsam.

@@ -2,6 +2,7 @@ import type { Router } from 'express';
 import type { SqliteDatabase } from '../database';
 import { registerCostRoutes } from './costs';
 import { registerMeterRoutes } from './meters';
+import { registerOperatingCostPlanRoutes } from './operating-cost-plans';
 import { registerPaymentRoutes } from './payments';
 import { registerPropertyRoutes } from './properties';
 import { registerReadingRoutes } from './readings';
@@ -17,6 +18,7 @@ export function registerResourceRoutes(router: Router, db: SqliteDatabase): void
   registerUnitRoutes(router, db);
   registerTenancyRoutes(router, db);
   registerCostRoutes(router, db);
+  registerOperatingCostPlanRoutes(router, db);
   registerMeterRoutes(router, db);
   registerReadingRoutes(router, db);
   registerPaymentRoutes(router, db);

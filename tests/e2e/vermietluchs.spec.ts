@@ -193,6 +193,44 @@ test.describe('Vermietluchs-Oberfläche', () => {
     await page.locator('.brand').click();
     await expect(page.getByRole('heading', { level: 1, name: 'Cockpit 2024' })).toBeVisible();
 
+    await page.getByLabel('Abrechnungsjahr auswählen', { exact: true }).selectOption('2023');
+    await navigate(page, 'Wirtschaftsplan', 'Wirtschaftsplan 2024');
+    await page.getByRole('button', { name: 'Wirtschaftsplan anlegen', exact: true }).click();
+    let planDialog = page.getByRole('dialog', {
+      name: 'Betriebskosten-Wirtschaftsplan 2024',
+    });
+    await planDialog.getByLabel('Wohnungskosten', { exact: true }).fill('1.883,45');
+    await planDialog.getByLabel('Garagenkosten', { exact: true }).fill('8,24');
+    await planDialog.getByLabel('Grundsteuer', { exact: true }).fill('106,29');
+    await expect(
+      planDialog.locator('.plan-form-preview span').filter({ hasText: /^Jahresbetrag/ }),
+    ).toContainText(/1\.997,98\s*€/);
+    await expect(
+      planDialog.locator('.plan-form-preview span').filter({ hasText: /^Rechnerisch pro Monat/ }),
+    ).toContainText(/166,50\s*€/);
+    await planDialog
+      .getByRole('button', { name: 'Wirtschaftsplan speichern', exact: true })
+      .click();
+    const planPaper = page.locator('.operating-cost-plan-paper');
+    await expect(planPaper).toContainText('Betriebskosten nach Wirtschaftsplan 2024');
+    await expect(planPaper).toContainText(/1\.997,98\s*€/);
+    await expect(planPaper).toContainText(/166,50\s*€/);
+    await expect(planPaper).toContainText(/150,00\s*€/);
+    await page.getByRole('button', { name: 'Drucken', exact: true }).click();
+    expect(await page.evaluate(() => Reflect.get(globalThis, '__vermietluchsPrintCalled'))).toBe(
+      true,
+    );
+    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
+    planDialog = page.getByRole('dialog', { name: 'Betriebskosten-Wirtschaftsplan 2024' });
+    await planDialog
+      .getByLabel('Festgelegte monatliche Vorauszahlung', { exact: true })
+      .fill('166,50');
+    await planDialog
+      .getByRole('button', { name: 'Wirtschaftsplan speichern', exact: true })
+      .click();
+    await expect(planPaper).toContainText('entspricht dem rechnerischen Monatsbetrag');
+    await page.getByLabel('Abrechnungsjahr auswählen', { exact: true }).selectOption('2024');
+
     await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Manfred Lämmerzahl');
     await page.getByRole('button', { name: 'Einstellungen speichern', exact: true }).click();

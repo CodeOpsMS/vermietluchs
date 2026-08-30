@@ -74,7 +74,7 @@ describe('HTTP-API und SQLite-Persistenz', () => {
 
   test('Migration, Health-Route und Foreign Keys sind aktiv', async () => {
     const health = await request(app).get('/api/health').expect(200);
-    expect(health.body).toEqual({ ok: true, database: ['ok'], schemaVersion: 1 });
+    expect(health.body).toEqual({ ok: true, database: ['ok'], schemaVersion: 2 });
     expect(health.headers['cache-control']).toBe('no-store');
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
     expect(db.pragma('journal_mode', { simple: true })).toBe('wal');
@@ -220,6 +220,94 @@ describe('HTTP-API und SQLite-Persistenz', () => {
       .expect(400);
 
     expect(response.body.error).toContain('nicht im Kostenjahr');
+  });
+
+  test('Wirtschaftspläne speichern Folgejahreswerte und berechnen die Monatsbeträge', async () => {
+    const property = await createProperty();
+    const unit = await createUnit(property.id);
+    const tenancy = (
+      await request(app).post('/api/tenancies').send(tenancyInput(unit.id)).expect(201)
+    ).body;
+    const input = {
+      propertyId: property.id,
+      tenancyId: tenancy.id,
+      year: 2025,
+      housingCosts: 1883.45,
+      garageCosts: 8.24,
+      propertyTax: 106.29,
+      months: 12,
+      monthlyPrepayment: 150,
+      notes: 'Wirtschaftsplan der WEG',
+    };
+
+    const created = await request(app).post('/api/operating-cost-plans').send(input).expect(201);
+    expect(created.body).toMatchObject({
+      ...input,
+      revision: 0,
+      annualTotal: 1997.98,
+      calculatedMonthlyAmount: 166.5,
+      monthlyDifference: -16.5,
+    });
+    expect(
+      (await request(app).get(`/api/operating-cost-plans/${created.body.id}`).expect(200)).body,
+    ).toEqual(created.body);
+    const listed = await request(app)
+      .get(`/api/operating-cost-plans?propertyId=${property.id}&year=2025`)
+      .expect(200);
+    expect(listed.body).toEqual([created.body]);
+
+    const updated = await request(app)
+      .put(`/api/operating-cost-plans/${created.body.id}`)
+      .send({ ...input, monthlyPrepayment: 167, revision: 0 })
+      .expect(200);
+    expect(updated.body).toMatchObject({ revision: 1, monthlyDifference: 0.5 });
+    await request(app)
+      .put(`/api/operating-cost-plans/${created.body.id}`)
+      .send({ ...input, revision: 0 })
+      .expect(409);
+    await request(app)
+      .delete(`/api/operating-cost-plans/${created.body.id}`)
+      .set('If-Match', '1')
+      .expect(204);
+  });
+
+  test('Wirtschaftspläne verlangen ein passendes Objekt und Mietjahr', async () => {
+    const firstProperty = await createProperty();
+    const secondProperty = (
+      await request(app)
+        .post('/api/properties')
+        .send({ ...propertyInput, name: 'Haus B' })
+        .expect(201)
+    ).body;
+    const unit = await createUnit(firstProperty.id);
+    const tenancy = (
+      await request(app)
+        .post('/api/tenancies')
+        .send(tenancyInput(unit.id, { endDate: '2024-12-31' }))
+        .expect(201)
+    ).body;
+    const input = {
+      propertyId: secondProperty.id,
+      tenancyId: tenancy.id,
+      year: 2025,
+      housingCosts: 1000,
+      garageCosts: 0,
+      propertyTax: 100,
+      months: 12,
+      monthlyPrepayment: null,
+      notes: '',
+    };
+    expect(
+      (await request(app).post('/api/operating-cost-plans').send(input).expect(400)).body.error,
+    ).toContain('anderen Objekt');
+    expect(
+      (
+        await request(app)
+          .post('/api/operating-cost-plans')
+          .send({ ...input, propertyId: firstProperty.id })
+          .expect(400)
+      ).body.error,
+    ).toContain('nicht im Jahr');
   });
 
   test('Mieterwechsel beendet, erstellt und liest atomar ab', async () => {
