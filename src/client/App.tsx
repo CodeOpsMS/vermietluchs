@@ -3,16 +3,35 @@ import { DATA_CONFLICT_EVENT, getJson } from './api';
 import { ErrorBox, Loading } from './components/Common';
 import ThemeToggle from './components/ThemeToggle';
 import { applyTheme, readInitialTheme, type ThemeMode } from './theme';
-import type { AppData, Cost, Meter, Payment, Property, Reading, Tenancy, Unit } from './types';
+import type {
+  AppData,
+  Cost,
+  Meter,
+  OperatingCostPlan,
+  Payment,
+  Property,
+  Reading,
+  Tenancy,
+  Unit,
+} from './types';
 import CockpitPage from './pages/CockpitPage';
 import PropertiesPage from './pages/PropertiesPage';
 import CostsPage from './pages/CostsPage';
 import MetersPage from './pages/MetersPage';
 import RentPage from './pages/RentPage';
 import SettlementPage from './pages/SettlementPage';
+import OperatingCostPlanPage from './pages/OperatingCostPlanPage';
 import SettingsPage from './pages/SettingsPage';
 
-type PageId = 'cockpit' | 'properties' | 'costs' | 'meters' | 'rent' | 'settlement' | 'settings';
+type PageId =
+  | 'cockpit'
+  | 'properties'
+  | 'costs'
+  | 'meters'
+  | 'rent'
+  | 'settlement'
+  | 'operating-cost-plan'
+  | 'settings';
 
 const NAVIGATION_GROUPS: { label: string; items: { id: PageId; label: string }[] }[] = [
   {
@@ -29,7 +48,10 @@ const NAVIGATION_GROUPS: { label: string; items: { id: PageId; label: string }[]
   },
   {
     label: 'Abrechnen · Jahresende',
-    items: [{ id: 'settlement', label: 'Abrechnung' }],
+    items: [
+      { id: 'settlement', label: 'Abrechnung' },
+      { id: 'operating-cost-plan', label: 'Wirtschaftsplan' },
+    ],
   },
   {
     label: 'Einrichten · selten',
@@ -48,6 +70,7 @@ const EMPTY_DATA: AppData = {
   meters: [],
   readings: [],
   payments: [],
+  operatingCostPlans: [],
 };
 
 export default function App() {
@@ -72,16 +95,27 @@ export default function App() {
     else setInitialLoading(true);
     setError('');
     try {
-      const [properties, units, tenancies, costs, meters, readings, payments] = await Promise.all([
-        getJson<Property[]>('/api/properties'),
-        getJson<Unit[]>('/api/units'),
-        getJson<Tenancy[]>('/api/tenancies'),
-        getJson<Cost[]>('/api/costs'),
-        getJson<Meter[]>('/api/meters'),
-        getJson<Reading[]>('/api/readings'),
-        getJson<Payment[]>('/api/payments'),
-      ]);
-      setData({ properties, units, tenancies, costs, meters, readings, payments });
+      const [properties, units, tenancies, costs, meters, readings, payments, operatingCostPlans] =
+        await Promise.all([
+          getJson<Property[]>('/api/properties'),
+          getJson<Unit[]>('/api/units'),
+          getJson<Tenancy[]>('/api/tenancies'),
+          getJson<Cost[]>('/api/costs'),
+          getJson<Meter[]>('/api/meters'),
+          getJson<Reading[]>('/api/readings'),
+          getJson<Payment[]>('/api/payments'),
+          getJson<OperatingCostPlan[]>('/api/operating-cost-plans'),
+        ]);
+      setData({
+        properties,
+        units,
+        tenancies,
+        costs,
+        meters,
+        readings,
+        payments,
+        operatingCostPlans,
+      });
       setHasLoaded(true);
       loadedOnce.current = true;
       setPropertyId((current) => {
@@ -132,6 +166,7 @@ export default function App() {
     data.costs.forEach((cost) => addYear(cost.year));
     data.payments.forEach((payment) => addYear(payment.dueDate));
     data.readings.forEach((reading) => addYear(reading.date));
+    data.operatingCostPlans.forEach((plan) => addYear(plan.year - 1));
     data.tenancies.forEach((tenancy) => {
       const startYear = Number(tenancy.startDate.slice(0, 4));
       const endYear = tenancy.endDate ? Number(tenancy.endDate.slice(0, 4)) : currentYear + 1;
@@ -141,7 +176,7 @@ export default function App() {
     });
     years.add(year);
     return [...years].sort((left, right) => right - left);
-  }, [data.costs, data.payments, data.readings, data.tenancies, year]);
+  }, [data.costs, data.operatingCostPlans, data.payments, data.readings, data.tenancies, year]);
   const filtered = useMemo<AppData>(() => {
     if (!propertyId)
       return {
@@ -152,6 +187,7 @@ export default function App() {
         meters: [],
         readings: [],
         payments: [],
+        operatingCostPlans: [],
       };
     const units = data.units.filter((unit) => unit.propertyId === propertyId);
     const unitIds = new Set(units.map((unit) => unit.id));
@@ -167,6 +203,7 @@ export default function App() {
       meters,
       readings: data.readings.filter((reading) => meterIds.has(reading.meterId)),
       payments: data.payments.filter((payment) => tenancyIds.has(payment.tenancyId)),
+      operatingCostPlans: data.operatingCostPlans.filter((plan) => plan.propertyId === propertyId),
     };
   }, [data, propertyId]);
 
@@ -296,6 +333,9 @@ export default function App() {
           )}
           {!initialLoading && hasLoaded && page === 'settlement' && (
             <SettlementPage key={pageScopeKey} {...pageProps} />
+          )}
+          {!initialLoading && hasLoaded && page === 'operating-cost-plan' && (
+            <OperatingCostPlanPage key={pageScopeKey} {...pageProps} />
           )}
           {!initialLoading && hasLoaded && page === 'settings' && (
             <SettingsPage key={scopeRevision} reload={loadAll} />

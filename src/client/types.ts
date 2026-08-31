@@ -1,6 +1,7 @@
 import type {
   CostInput,
   MeterInput,
+  OperatingCostPlanInput,
   PaymentInput,
   PropertyInput,
   ReadingInput,
@@ -23,6 +24,12 @@ export type Cost = CostInput & EntityMeta;
 export type Meter = MeterInput & EntityMeta;
 export type Reading = ReadingInput & EntityMeta;
 export type Payment = PaymentInput & EntityMeta;
+export type OperatingCostPlan = OperatingCostPlanInput &
+  EntityMeta & {
+    annualTotal: number;
+    calculatedMonthlyAmount: number;
+    monthlyDifference: number | null;
+  };
 export type Settings = SettingsInput;
 
 export type TenantStatus = CostInput['tenantStatus'];
@@ -109,4 +116,5 @@ export type AppData = {
   meters: Meter[];
   readings: Reading[];
   payments: Payment[];
+  operatingCostPlans: OperatingCostPlan[];
 };

@@ -87,6 +87,27 @@ angefangenen Monat setzt es zunächst den vollen vertraglichen Monatsbetrag an,
 weil eine anteilige Miethöhe nicht ohne den konkreten Vertrag entschieden werden
 kann. Ein solcher Teilmonat muss bei Bedarf im Mietkonto angepasst werden.
 
+## Betriebskosten-Wirtschaftsplan für das Folgejahr
+
+Der Wirtschaftsplan ist fachlich von den tatsächlichen Kosten und von einer
+abgeschlossenen Abrechnung getrennt. Zum oben ausgewählten Abrechnungsjahr zeigt
+die App immer das folgende Planjahr. Für jedes in diesem Planjahr aktive
+Mietverhältnis kann genau ein Plan gespeichert werden.
+
+Der Plan übernimmt die drei vorbereiteten Sammelpositionen Wohnung, Garage und
+Grundsteuer als bereits für das Mietverhältnis bestimmte Jahreswerte. Daraus
+berechnet die App den Jahresbetrag und teilt ihn centgenau durch ein bis zwölf
+Monate. Eine abweichend festgelegte monatliche Vorauszahlung wird separat
+gespeichert und mit dem rechnerischen Monatsbetrag verglichen. Als Eingabehilfe
+beginnt sie bei der aktuell im Mietvertrag hinterlegten Betriebs- und
+Garagenvorauszahlung.
+
+Ein Wirtschaftsplan ändert weder den Mietvertrag noch bestehende oder künftige
+Mietkontobuchungen automatisch. So bleibt eine Erhöhung eine bewusste
+vertragliche Entscheidung. Planblatt und Notiz können im Browser gedruckt oder
+als PDF gespeichert werden. Wirtschaftspläne sind Bestandteil des JSON-Backups;
+ältere Backups ohne Plantabelle bleiben importierbar.
+
 ## Rundung
 
 Die Fachberechnung führt alle Geldbeträge als ganzzahlige Centbeträge. Muss ein

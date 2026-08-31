@@ -1,6 +1,6 @@
 # Teststrategie
 
-Stand: 28. August 2026. Die Suite umfasst 21 Vitest-Dateien mit 192 Tests, zwei
+Stand: 30. August 2026. Die Suite umfasst 22 Vitest-Dateien mit 201 Tests, zwei
 Chromium-End-to-End-Szenarien und zwei Tests des gebauten Container-Images.
 
 ## Prüfungen
@@ -62,6 +62,8 @@ Schranke besitzt.
   Altformat-Zahlungen, Zählergruppierung und Farbschema.
 - `database-migrations.test.ts`: Reihenfolge, doppelte Versionen, Umbenennung und
   Idempotenz.
+- `operating-cost-plan.test.ts`: centgenaue Jahres-/Monatsrechnung und deutsche
+  Formulareingaben am Excel-Beispiel.
 - `http-infrastructure.test.ts`: Host-Allowlist, JSON-Fehler und fehlerhafter
   SQLite-Healthcheck.
 
