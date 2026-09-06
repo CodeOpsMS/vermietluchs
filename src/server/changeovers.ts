@@ -5,6 +5,7 @@ import { ApiError } from './errors';
 import { eurosToCents } from './money';
 import { decodeReading } from './routes/readings';
 import { decodeTenancy } from './routes/tenancies';
+import { validateTenancyYearReferences } from './tenancy-period';
 
 type Row = Record<string, unknown>;
 
@@ -32,6 +33,13 @@ export function registerChangeoverRoute(router: Router, db: SqliteDatabase): voi
           'Das neue Mietverhältnis muss nach dem Ende des bisherigen beginnen.',
         );
       }
+
+      validateTenancyYearReferences(
+        db,
+        input.previousTenancyId,
+        String(previous.start_date),
+        input.endDate,
+      );
 
       const futurePayments = db
         .prepare(

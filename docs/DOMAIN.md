@@ -108,6 +108,14 @@ vertragliche Entscheidung. Planblatt und Notiz können im Browser gedruckt oder
 als PDF gespeichert werden. Wirtschaftspläne sind Bestandteil des JSON-Backups;
 ältere Backups ohne Plantabelle bleiben importierbar.
 
+Bei Änderungen des Mietzeitraums und beim Mieterwechsel müssen bereits
+zugeordnete Wirtschaftspläne und direkte Kosten weiterhin ein Jahr des
+Mietverhältnisses betreffen. Andernfalls wird die Änderung ohne Datenverlust
+abgelehnt. Zuerst muss der betreffende Plan bewusst korrigiert oder gelöscht
+bzw. die Kostenzuordnung korrigiert werden. Ein Teiljahr innerhalb desselben
+Plan-/Kostenjahres bleibt erlaubt; Beträge und Planmonate werden nicht
+automatisch geändert. Gespeicherte Abrechnungssnapshots bleiben unangetastet.
+
 ## Rundung
 
 Die Fachberechnung führt alle Geldbeträge als ganzzahlige Centbeträge. Muss ein
