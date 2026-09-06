@@ -32,10 +32,24 @@ PDF → /api/ai/scan → Provideradapter → prüfbarer Entwurf im Browser
 ```
 
 OpenAI und Mistral erhalten die PDF-Datei direkt über ihre fest verdrahteten
-offiziellen HTTPS-Endpunkte. Bei Ollama wird lokal vorhandener PDF-Text genutzt;
-reine Bild-PDFs werden seitenweise lokal gerendert. Die einheitliche,
+offiziellen HTTPS-Endpunkte. Ollama und OpenAI-kompatible Chat-APIs teilen sich
+die lokale PDF-Aufbereitung und denselben Extraktionsprompt mit JSON-Schema.
+Text-, Automatik- und Bildmodus sowie Schema-, JSON- und Prompt-Ausgabe sind
+konfigurierbar. Bei gemischten PDFs prüft die Automatik jede Seite einzeln;
+Text-/Bildgrenzen führen zum Abbruch statt zu unvollständigen Entwürfen. Die einheitliche,
 serverseitig validierte Antwort enthält keine Mieter-, Zahlungs- oder
 Abrechnungsobjekte.
+
+Kompatible Endpunkte unterstützen freie Modell-IDs und optionale Bearer-Schlüssel.
+Schlüssel werden unter `compatible:<normalisierte Basis-URL>` gespeichert;
+ein Adresswechsel übernimmt keine Zugangsdaten des vorherigen Ziels.
+Verbindungstests nutzen ausschließlich die gespeicherte Konfiguration.
+
+Migration `002` bleibt dem veröffentlichten Wirtschaftsplan vorbehalten; `003`
+ergänzt den KI-Scan, `004` die kompatible API und Eingabe-/Ausgabemodi. Nur der
+bekannte Vorabstand `002_ai_scan.sql` wird beim Upgrade auf `003_ai_scan.sql`
+umgeordnet, sodass vorhandene KI-Einstellungen erhalten bleiben. Andere
+umbenannte oder doppelte Migrationen bleiben Fehler.
 
 ## Warum diese Werkzeuge?
 

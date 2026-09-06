@@ -61,6 +61,8 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
         provider: aiSettings.provider,
         model: aiSettings.model,
         baseUrl: aiSettings.baseUrl,
+        documentMode: aiSettings.documentMode,
+        outputMode: aiSettings.outputMode,
         apiKey: apiKey.trim() || undefined,
         clearApiKey,
         revision: aiSettings.revision,
@@ -98,6 +100,8 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
       provider,
       model: defaults.model,
       baseUrl: defaults.baseUrl,
+      documentMode: provider === 'compatible' ? 'text' : 'auto',
+      outputMode: provider === 'compatible' ? 'prompt' : 'json_schema',
       apiKeyConfigured: false,
     });
     setApiKey('');
@@ -255,6 +259,7 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
                     <option value="ollama">Ollama · lokal</option>
                     <option value="openai">OpenAI</option>
                     <option value="mistral">Mistral / Mixtral</option>
+                    <option value="compatible">OpenAI-kompatible API · frei konfigurierbar</option>
                   </select>
                 </label>
                 <label className="field span-2">
@@ -264,48 +269,101 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
                     onChange={(event) =>
                       setAiSettings({ ...aiSettings, model: event.target.value })
                     }
-                    placeholder={AI_PROVIDER_DEFAULTS[aiSettings.provider].model}
+                    required
+                    placeholder={
+                      AI_PROVIDER_DEFAULTS[aiSettings.provider].model ||
+                      'Modell-ID deines Anbieters'
+                    }
                   />
                 </label>
                 <label className="field span-2">
                   API-Adresse
                   <input
                     value={aiSettings.baseUrl}
-                    readOnly={aiSettings.provider !== 'ollama'}
+                    readOnly={['openai', 'mistral'].includes(aiSettings.provider)}
                     onChange={(event) =>
-                      setAiSettings({ ...aiSettings, baseUrl: event.target.value })
+                      setAiSettings({
+                        ...aiSettings,
+                        baseUrl: event.target.value,
+                        apiKeyConfigured: false,
+                      })
                     }
                   />
                   <small>
                     {aiSettings.provider === 'ollama'
                       ? 'Im Docker-Container meist http://host.docker.internal:11434 oder eine private LAN-IP.'
-                      : 'Cloud-Endpunkte sind zum Schutz von Schlüssel und PDF fest vorgegeben.'}
+                      : aiSettings.provider === 'compatible'
+                        ? 'Basis-URL inklusive API-Pfad, z. B. http://localhost:1234/v1. Modell-ID frei eintragen. Im Container ggf. host.docker.internal verwenden.'
+                        : 'Cloud-Endpunkte sind zum Schutz von Schlüssel und PDF fest vorgegeben.'}
                   </small>
                 </label>
-                {aiSettings.provider !== 'ollama' && (
-                  <label className="field span-2">
-                    API-Schlüssel
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      value={apiKey}
-                      onChange={(event) => {
-                        setApiKey(event.target.value);
-                        if (event.target.value) setClearApiKey(false);
-                      }}
-                      placeholder={
-                        aiSettings.apiKeyConfigured
-                          ? 'Schlüssel gespeichert · leer lassen zum Beibehalten'
-                          : 'API-Schlüssel eintragen'
-                      }
-                    />
-                    <small>
-                      Separat mit Dateirechten 0600 gespeichert; nicht in SQLite, API-Antworten oder
-                      JSON-Backups enthalten.
-                    </small>
-                  </label>
+                {['ollama', 'compatible'].includes(aiSettings.provider) && (
+                  <>
+                    <label className="field span-2">
+                      PDF-Eingabe
+                      <select
+                        value={aiSettings.documentMode}
+                        onChange={(event) =>
+                          setAiSettings({
+                            ...aiSettings,
+                            documentMode: event.target.value as AiSettings['documentMode'],
+                          })
+                        }
+                      >
+                        <option value="text">Nur Text · für Textmodelle</option>
+                        <option value="auto">Automatisch · Text, bei Bedarf Seitenbilder</option>
+                        <option value="images">Alle Seiten als Bilder · für Bildmodelle</option>
+                      </select>
+                      <small>
+                        Automatik und Seitenbilder benötigen ein Modell mit Bildverständnis.
+                        Gescannte Dokumente benötigen im Textmodus vorher OCR.
+                      </small>
+                    </label>
+                    <label className="field span-2">
+                      JSON-Ausgabe
+                      <select
+                        value={aiSettings.outputMode}
+                        onChange={(event) =>
+                          setAiSettings({
+                            ...aiSettings,
+                            outputMode: event.target.value as AiSettings['outputMode'],
+                          })
+                        }
+                      >
+                        <option value="json_schema">Striktes JSON-Schema</option>
+                        <option value="json_object">JSON-Modus</option>
+                        <option value="prompt">Nur Prompt · größte Kompatibilität</option>
+                      </select>
+                      <small>
+                        Wähle ein vom Modell unterstütztes Format. Der Entwurf wird in jedem Modus
+                        vor der Übernahme geprüft.
+                      </small>
+                    </label>
+                  </>
                 )}
-                {aiSettings.provider !== 'ollama' && aiSettings.apiKeyConfigured && (
+                <label className="field span-2">
+                  API-Schlüssel
+                  {['ollama', 'compatible'].includes(aiSettings.provider) ? ' (optional)' : ''}
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={apiKey}
+                    onChange={(event) => {
+                      setApiKey(event.target.value);
+                      if (event.target.value) setClearApiKey(false);
+                    }}
+                    placeholder={
+                      aiSettings.apiKeyConfigured
+                        ? 'Schlüssel gespeichert · leer lassen zum Beibehalten'
+                        : 'API-Schlüssel eintragen'
+                    }
+                  />
+                  <small>
+                    Separat mit Dateirechten 0600 gespeichert; nicht in SQLite, API-Antworten oder
+                    JSON-Backups enthalten.
+                  </small>
+                </label>
+                {aiSettings.apiKeyConfigured && (
                   <label className="check-field span-2">
                     <input
                       type="checkbox"
@@ -316,7 +374,12 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
                   </label>
                 )}
                 <div className="ai-privacy-note span-2">
-                  {aiSettings.provider === 'ollama' ? (
+                  {aiSettings.provider === 'compatible' ? (
+                    <>
+                      <strong>Gewählte API:</strong> PDF-Text bzw. Seitenbilder werden an{' '}
+                      {aiSettings.baseUrl} gesendet. Schlüssel werden pro API-Adresse gespeichert.
+                    </>
+                  ) : aiSettings.provider === 'ollama' ? (
                     <>
                       <strong>Lokale Verarbeitung:</strong> PDF-Inhalt bleibt bei deiner
                       Ollama-Instanz.

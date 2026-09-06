@@ -218,6 +218,19 @@ export const settlementCreateSchema = z
   })
   .strict();
 
+export const operatingCostPlanInputSchema = z.object({
+  propertyId: idSchema,
+  tenancyId: idSchema,
+  year: yearSchema,
+  housingCosts: moneySchema,
+  garageCosts: moneySchema.default(0),
+  propertyTax: moneySchema.default(0),
+  months: z.number().int().min(1).max(12).default(12),
+  monthlyPrepayment: moneySchema.nullable().default(null),
+  notes: optionalText,
+  revision: revisionSchema.optional(),
+});
+
 export const settlementCloseSchema = z
   .object({
     propertyId: idSchema,
@@ -252,4 +265,5 @@ export type CostInput = z.infer<typeof costInputSchema>;
 export type MeterInput = z.infer<typeof meterInputSchema>;
 export type ReadingInput = z.infer<typeof readingInputSchema>;
 export type PaymentInput = z.infer<typeof paymentInputSchema>;
+export type OperatingCostPlanInput = z.infer<typeof operatingCostPlanInputSchema>;
 export type Backup = z.infer<typeof backupSchema>;

@@ -2,13 +2,24 @@ import { z } from 'zod';
 import { ALLOCATION_KEYS, METER_TYPES } from './constants';
 import { dateSchema, idSchema, moneySchema, revisionSchema, yearSchema } from './schemas';
 
-export const AI_PROVIDERS = ['openai', 'mistral', 'ollama'] as const;
+export const AI_PROVIDERS = ['openai', 'mistral', 'ollama', 'compatible'] as const;
 export const aiProviderSchema = z.enum(AI_PROVIDERS);
+
+export const AI_PROVIDER_LABELS = {
+  openai: 'OpenAI',
+  mistral: 'Mistral',
+  ollama: 'Ollama',
+  compatible: 'OpenAI-kompatible API',
+} as const;
+
+export const aiDocumentModeSchema = z.enum(['auto', 'text', 'images']);
+export const aiOutputModeSchema = z.enum(['json_schema', 'json_object', 'prompt']);
 
 export const AI_PROVIDER_DEFAULTS = {
   openai: { model: 'gpt-4.1-mini', baseUrl: 'https://api.openai.com/v1' },
   mistral: { model: 'mistral-small-latest', baseUrl: 'https://api.mistral.ai/v1' },
   ollama: { model: 'qwen2.5vl:7b', baseUrl: 'http://localhost:11434' },
+  compatible: { model: '', baseUrl: 'http://localhost:1234/v1' },
 } as const;
 
 export const aiSettingsUpdateSchema = z
@@ -17,13 +28,15 @@ export const aiSettingsUpdateSchema = z
     provider: aiProviderSchema,
     model: z.string().trim().min(1).max(200),
     baseUrl: z.string().trim().url().max(500),
+    documentMode: aiDocumentModeSchema.default('auto'),
+    outputMode: aiOutputModeSchema.default('json_schema'),
     apiKey: z.string().trim().min(1).max(1000).optional(),
     clearApiKey: z.boolean().default(false),
     revision: revisionSchema,
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.provider !== 'ollama' && !value.baseUrl.startsWith('https://')) {
+    if (['openai', 'mistral'].includes(value.provider) && !value.baseUrl.startsWith('https://')) {
       context.addIssue({
         code: 'custom',
         path: ['baseUrl'],
@@ -156,6 +169,8 @@ export const aiImportRequestSchema = z
   });
 
 export type AiProvider = z.infer<typeof aiProviderSchema>;
+export type AiDocumentMode = z.infer<typeof aiDocumentModeSchema>;
+export type AiOutputMode = z.infer<typeof aiOutputModeSchema>;
 export type AiSettingsUpdate = z.infer<typeof aiSettingsUpdateSchema>;
 export type AiConnectionTest = z.infer<typeof aiConnectionTestSchema>;
 export type AiScanCost = z.infer<typeof aiScanCostSchema>;

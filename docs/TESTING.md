@@ -1,8 +1,9 @@
 # Teststrategie
 
-Stand: 30. August 2026. Die Suite umfasst zusätzlich gezielte Tests der
+Stand: 6. September 2026. Die Suite umfasst zusätzlich gezielte Tests der
 KI-Provider, Sicherheitsgrenzen und des transaktionalen Imports sowie ein
-Chromium-Szenario für die optionale Navigation.
+Chromium-Szenario für die optionale Navigation, den Wirtschaftsplan und zwei
+Tests des gebauten Container-Images.
 
 ## Prüfungen
 
@@ -64,6 +65,8 @@ Schranke besitzt.
   Altformat-Zahlungen, Zählergruppierung und Farbschema.
 - `database-migrations.test.ts`: Reihenfolge, doppelte Versionen, Umbenennung und
   Idempotenz.
+- `operating-cost-plan.test.ts`: centgenaue Jahres-/Monatsrechnung und deutsche
+  Formulareingaben am Excel-Beispiel.
 - `http-infrastructure.test.ts`: Host-Allowlist, JSON-Fehler und fehlerhafter
   SQLite-Healthcheck.
 - `ai*.test.ts`: feste Cloud-Ziele, private Ollama-Ziele, Schlüsselschutz,

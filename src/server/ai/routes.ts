@@ -7,6 +7,8 @@ import {
   aiScanRequestSchema,
   aiSettingsUpdateSchema,
   type AiProvider,
+  type AiDocumentMode,
+  type AiOutputMode,
   type AiSettings,
 } from '../../shared/ai';
 import type { SqliteDatabase } from '../database';
@@ -20,6 +22,8 @@ type AiSettingsRow = {
   provider: AiProvider;
   model: string;
   base_url: string;
+  document_mode: AiDocumentMode;
+  output_mode: AiOutputMode;
   revision: number;
   updated_at: string;
 };
@@ -42,13 +46,14 @@ function isPrivateIpv4(hostname: string): boolean {
 }
 
 export function safeProviderBaseUrl(provider: AiProvider, configured: string): string {
-  if (provider !== 'ollama') return AI_PROVIDER_DEFAULTS[provider].baseUrl;
+  if (provider === 'openai' || provider === 'mistral')
+    return AI_PROVIDER_DEFAULTS[provider].baseUrl;
 
   let url: URL;
   try {
     url = new URL(configured);
   } catch {
-    throw new ApiError(400, 'Die Ollama-Adresse ist ungültig.');
+    throw new ApiError(400, 'Die API-Adresse ist ungültig.');
   }
   const hostname = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
   const ipVersion = isIP(hostname);
@@ -58,6 +63,27 @@ export function safeProviderBaseUrl(provider: AiProvider, configured: string): s
     (ipVersion === 4 && isPrivateIpv4(hostname)) ||
     (ipVersion === 6 &&
       (hostname === '::1' || hostname.startsWith('fc') || hostname.startsWith('fd')));
+  if (provider === 'compatible') {
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      (!safeHostname && url.protocol !== 'https:') ||
+      (ipVersion !== 0 &&
+        !safeHostname &&
+        (hostname.startsWith('169.254.') ||
+          hostname.startsWith('fe80:') ||
+          hostname === '0.0.0.0' ||
+          hostname === '::')) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    )
+      throw new ApiError(
+        400,
+        'Die API-Adresse benötigt HTTPS oder ein privates HTTP-Ziel, ohne Zugangsdaten, Query oder Fragment.',
+      );
+    return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+  }
   if (
     !safeHostname ||
     !['http:', 'https:'].includes(url.protocol) ||
@@ -80,7 +106,13 @@ function runtimeSettings(row: AiSettingsRow): AiRuntimeSettings {
     provider: row.provider,
     model: row.model,
     baseUrl: safeProviderBaseUrl(row.provider, row.base_url),
+    documentMode: row.document_mode,
+    outputMode: row.output_mode,
   };
+}
+
+function secretScope(provider: AiProvider, baseUrl: string): string {
+  return provider === 'compatible' ? `compatible:${baseUrl}` : provider;
 }
 
 function publicSettings(row: AiSettingsRow, secretStore: AiSecretStore): AiSettings {
@@ -89,7 +121,11 @@ function publicSettings(row: AiSettingsRow, secretStore: AiSecretStore): AiSetti
     provider: row.provider,
     model: row.model,
     baseUrl: safeProviderBaseUrl(row.provider, row.base_url),
-    apiKeyConfigured: secretStore.has(row.provider),
+    documentMode: row.document_mode,
+    outputMode: row.output_mode,
+    apiKeyConfigured: secretStore.has(
+      secretScope(row.provider, safeProviderBaseUrl(row.provider, row.base_url)),
+    ),
     revision: row.revision,
     updatedAt: row.updated_at,
   };
@@ -124,25 +160,35 @@ export function registerAiRoutes(
         currentRevision: current.revision,
       });
     }
-    const hasKey =
-      Boolean(input.apiKey) || (!input.clearApiKey && options.secretStore.has(input.provider));
-    if (input.enabled && input.provider !== 'ollama' && !hasKey) {
+    const baseUrl = safeProviderBaseUrl(input.provider, input.baseUrl);
+    const scope = secretScope(input.provider, baseUrl);
+    const hasKey = Boolean(input.apiKey) || (!input.clearApiKey && options.secretStore.has(scope));
+    if (input.enabled && ['openai', 'mistral'].includes(input.provider) && !hasKey) {
       throw new ApiError(400, 'Zum Aktivieren des Cloud-Anbieters fehlt der API-Schlüssel.');
     }
-    const baseUrl = safeProviderBaseUrl(input.provider, input.baseUrl);
-    const changed = db
-      .prepare(
-        `UPDATE ai_settings
-         SET enabled = ?, provider = ?, model = ?, base_url = ?,
+    db.transaction(() => {
+      const changed = db
+        .prepare(
+          `UPDATE ai_settings
+         SET enabled = ?, provider = ?, model = ?, base_url = ?, document_mode = ?, output_mode = ?,
              revision = revision + 1, updated_at = CURRENT_TIMESTAMP
          WHERE id = 1 AND revision = ?`,
-      )
-      .run(input.enabled ? 1 : 0, input.provider, input.model, baseUrl, input.revision);
-    if (changed.changes !== 1) {
-      throw new ApiError(409, 'Die KI-Einstellungen wurden zwischenzeitlich geändert.');
-    }
-    if (input.clearApiKey) options.secretStore.clear(input.provider);
-    if (input.apiKey) options.secretStore.write(input.provider, input.apiKey);
+        )
+        .run(
+          input.enabled ? 1 : 0,
+          input.provider,
+          input.model,
+          baseUrl,
+          input.documentMode,
+          input.outputMode,
+          input.revision,
+        );
+      if (changed.changes !== 1) {
+        throw new ApiError(409, 'Die KI-Einstellungen wurden zwischenzeitlich geändert.');
+      }
+      if (input.apiKey) options.secretStore.write(scope, input.apiKey);
+      else if (input.clearApiKey) options.secretStore.clear(scope);
+    })();
     response.json(publicSettings(settingsRow(db), options.secretStore));
   });
 
@@ -150,14 +196,17 @@ export function registerAiRoutes(
     '/ai/test',
     asyncHandler(async (request, response) => {
       const input = aiConnectionTestSchema.parse(request.body);
-      const settings = {
-        provider: input.provider,
-        model: input.model,
-        baseUrl: safeProviderBaseUrl(input.provider, input.baseUrl),
-      };
+      const settings = runtimeSettings(settingsRow(db));
+      if (
+        input.provider !== settings.provider ||
+        input.model !== settings.model ||
+        safeProviderBaseUrl(input.provider, input.baseUrl) !== settings.baseUrl
+      ) {
+        throw new ApiError(409, 'Bitte die KI-Einstellungen vor dem Verbindungstest speichern.');
+      }
       const message = await options.service.testConnection(
         settings,
-        options.secretStore.read(input.provider),
+        options.secretStore.read(secretScope(settings.provider, settings.baseUrl)),
       );
       response.json({ ok: true, message });
     }),
@@ -173,7 +222,9 @@ export function registerAiRoutes(
       }
       const result = await options.service.scanPdf(
         runtimeSettings(current),
-        options.secretStore.read(current.provider),
+        options.secretStore.read(
+          secretScope(current.provider, safeProviderBaseUrl(current.provider, current.base_url)),
+        ),
         Buffer.from(input.dataBase64, 'base64'),
         {
           fileName: input.fileName,

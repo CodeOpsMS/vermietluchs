@@ -104,7 +104,46 @@ describe('Datenbankmigrationen', () => {
       provider: 'ollama',
     });
     expect(db.prepare('SELECT max(version) AS version FROM schema_migrations').get()).toEqual({
-      version: 2,
+      version: 4,
     });
   });
+
+  test.each(['main', 'ai-branch'] as const)(
+    'aktualisiert %s-Datenbanken ohne Verlust und bleibt idempotent',
+    (source) => {
+      for (const name of [
+        '001_initial.sql',
+        source === 'main' ? '002_operating_cost_plans.sql' : '003_ai_scan.sql',
+      ]) {
+        fs.copyFileSync(
+          path.resolve('migrations', name),
+          path.join(directory, name === '003_ai_scan.sql' ? '002_ai_scan.sql' : name),
+        );
+      }
+      runMigrations(db, directory);
+      db.prepare("INSERT INTO properties (name, address) VALUES ('Bestand', 'Bleibt')").run();
+      if (source === 'ai-branch')
+        db.prepare(
+          "UPDATE ai_settings SET enabled = 1, model = 'existing-model', revision = 7",
+        ).run();
+
+      runMigrations(db, path.resolve('migrations'));
+      runMigrations(db, path.resolve('migrations'));
+
+      expect(db.prepare('SELECT name FROM properties').get()).toEqual({ name: 'Bestand' });
+      expect(db.prepare('SELECT name FROM schema_migrations ORDER BY version').all()).toEqual([
+        { name: '001_initial.sql' },
+        { name: '002_operating_cost_plans.sql' },
+        { name: '003_ai_scan.sql' },
+        { name: '004_ai_compatible.sql' },
+      ]);
+      expect(db.prepare('SELECT count(*) AS total FROM operating_cost_plans').get()).toEqual({
+        total: 0,
+      });
+      if (source === 'ai-branch')
+        expect(
+          db.prepare('SELECT enabled, model, revision, document_mode FROM ai_settings').get(),
+        ).toEqual({ enabled: 1, model: 'existing-model', revision: 7, document_mode: 'auto' });
+    },
+  );
 });

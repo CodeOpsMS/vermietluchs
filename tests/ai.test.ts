@@ -288,6 +288,181 @@ describe('KI-Einstellungen, Scan und sicherer Import', () => {
     await request(app).post('/api/ai/import').send(requestBody(otherMeter.id)).expect(400);
     expect(db.prepare('SELECT count(*) AS total FROM costs').get()).toEqual({ total: 0 });
   });
+
+  test('bindet kompatible Schlüssel an die gespeicherte API-Adresse', async () => {
+    const config = {
+      enabled: true,
+      provider: 'compatible',
+      model: 'my-model',
+      baseUrl: 'https://first.example/v1/',
+      documentMode: 'text',
+      outputMode: 'prompt',
+      revision: 0,
+    };
+    const saved = await request(app)
+      .put('/api/ai/settings')
+      .send({ ...config, apiKey: 'first-secret' })
+      .expect(200);
+    expect(saved.body).toMatchObject({
+      baseUrl: 'https://first.example/v1',
+      apiKeyConfigured: true,
+      documentMode: 'text',
+      outputMode: 'prompt',
+    });
+    await request(app)
+      .post('/api/ai/test')
+      .send({ provider: 'compatible', model: 'my-model', baseUrl: 'https://second.example/v1' })
+      .expect(409);
+    expect(service.testConnection).not.toHaveBeenCalled();
+    const switched = await request(app)
+      .put('/api/ai/settings')
+      .send({ ...config, baseUrl: 'https://second.example/v1', revision: 1 })
+      .expect(200);
+    expect(switched.body.apiKeyConfigured).toBe(false);
+    await request(app)
+      .post('/api/ai/test')
+      .send({ provider: 'compatible', model: 'my-model', baseUrl: 'https://second.example/v1' })
+      .expect(200);
+    expect(service.testConnection).toHaveBeenLastCalledWith(
+      expect.objectContaining({ baseUrl: 'https://second.example/v1' }),
+      null,
+    );
+    const restored = await request(app)
+      .put('/api/ai/settings')
+      .send({ ...config, revision: 2 })
+      .expect(200);
+    expect(restored.body.apiKeyConfigured).toBe(true);
+    await request(app)
+      .post('/api/ai/test')
+      .send({ provider: 'compatible', model: 'my-model', baseUrl: 'https://first.example/v1' })
+      .expect(200);
+    expect(service.testConnection).toHaveBeenLastCalledWith(
+      expect.objectContaining({ baseUrl: 'https://first.example/v1' }),
+      'first-secret',
+    );
+    expect(JSON.stringify(restored.body)).not.toContain('first-secret');
+    expect(JSON.stringify((await request(app).get('/api/backup/export')).body)).not.toContain(
+      'first-secret',
+    );
+  });
+
+  test('aktiviert lokale kompatible APIs ohne Schlüssel und übergibt beide Modi an den Scanner', async () => {
+    const property = await createProperty();
+    await request(app)
+      .put('/api/ai/settings')
+      .send({
+        enabled: true,
+        provider: 'compatible',
+        model: 'local-model',
+        baseUrl: 'http://localhost:1234/v1',
+        documentMode: 'text',
+        outputMode: 'prompt',
+        revision: 0,
+      })
+      .expect(200);
+    await request(app)
+      .post('/api/ai/scan')
+      .send({
+        propertyId: property.id,
+        year: 2024,
+        fileName: 'test.pdf',
+        mimeType: 'application/pdf',
+        dataBase64: Buffer.from('%PDF-test').toString('base64'),
+      })
+      .expect(200);
+    expect(service.scanPdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'compatible',
+        documentMode: 'text',
+        outputMode: 'prompt',
+      }),
+      null,
+      expect.any(Buffer),
+      expect.any(Object),
+    );
+  });
+
+  test('schützt Revisionen, Schlüssel-Löschung und ungültige Konfigurationen', async () => {
+    const config = {
+      enabled: true,
+      provider: 'openai',
+      model: 'gpt-4.1-mini',
+      baseUrl: 'https://api.openai.com/v1',
+      revision: 0,
+    };
+    await request(app).put('/api/ai/settings').send(config).expect(400);
+    await request(app)
+      .put('/api/ai/settings')
+      .send({ ...config, apiKey: 'key' })
+      .expect(200);
+    await request(app)
+      .put('/api/ai/settings')
+      .send({ ...config, apiKey: 'stale' })
+      .expect(409);
+    expect(secretStore.read('openai')).toBe('key');
+    await request(app)
+      .put('/api/ai/settings')
+      .send({ ...config, revision: 1, clearApiKey: true })
+      .expect(400);
+    await request(app)
+      .put('/api/ai/settings')
+      .send({ ...config, revision: 1, enabled: false, clearApiKey: true })
+      .expect(200);
+    expect(secretStore.has('openai')).toBe(false);
+    await request(app)
+      .put('/api/ai/settings')
+      .send({ ...config, revision: 2, documentMode: 'invalid' })
+      .expect(400);
+  });
+
+  test('rollt die Konfiguration bei einem Fehler im Schlüsselspeicher zurück', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const write = vi.spyOn(secretStore, 'write').mockImplementation(() => {
+      throw new Error('disk full');
+    });
+    try {
+      await request(app)
+        .put('/api/ai/settings')
+        .send({
+          enabled: true,
+          provider: 'openai',
+          model: 'gpt-4.1-mini',
+          baseUrl: 'https://api.openai.com/v1',
+          apiKey: 'key',
+          revision: 0,
+        })
+        .expect(500);
+      expect((await request(app).get('/api/ai/settings')).body).toMatchObject({
+        enabled: false,
+        provider: 'ollama',
+        revision: 0,
+      });
+    } finally {
+      write.mockRestore();
+      logged.mockRestore();
+    }
+  });
+
+  test.each([
+    'http://public.example/v1',
+    'https://user:secret@api.example/v1',
+    'https://api.example/v1?token=secret',
+    'https://api.example/v1#fragment',
+    'file:///tmp/socket',
+    'http://169.254.169.254/v1',
+    'https://169.254.169.254/v1',
+  ])('lehnt das unzulässige kompatible Ziel %s ab', (url) => {
+    expect(() => safeProviderBaseUrl('compatible', url)).toThrow();
+  });
+
+  test.each([
+    'http://localhost:1234/v1',
+    'http://192.168.1.10:8080/custom/v1',
+    'http://[::1]:8080/v1',
+    'https://api.example/custom/v1',
+  ])('akzeptiert das explizit konfigurierte Ziel %s', (url) => {
+    expect(safeProviderBaseUrl('compatible', `${url}/`)).toBe(url);
+  });
 });
 
 describe('KI-Schlüsselspeicher', () => {
@@ -301,6 +476,10 @@ describe('KI-Schlüsselspeicher', () => {
       expect(fs.statSync(filename).mode & 0o777).toBe(0o600);
       store.clear('openai');
       expect(store.has('openai')).toBe(false);
+      store.write('compatible:https://first.example/v1', 'scoped-key');
+      const reopened = createFileAiSecretStore(directory);
+      expect(reopened.read('compatible:https://first.example/v1')).toBe('scoped-key');
+      expect(reopened.read('compatible:https://second.example/v1')).toBeNull();
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

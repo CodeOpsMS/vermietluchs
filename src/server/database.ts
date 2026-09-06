@@ -56,6 +56,19 @@ export function runMigrations(db: SqliteDatabase, migrationsDir: string): void {
     (left, right) => left.version - right.version || left.name.localeCompare(right.name, 'en'),
   );
 
+  // The unpublished AI branch used version 2 before main shipped the operating
+  // cost plan. Preserve that exact branch's settings when upgrading to both.
+  if (
+    migrationByVersion.get(2) === '002_operating_cost_plans.sql' &&
+    migrationByVersion.get(3) === '003_ai_scan.sql'
+  ) {
+    db.prepare(
+      `UPDATE schema_migrations SET version = 3, name = '003_ai_scan.sql'
+       WHERE version = 2 AND name = '002_ai_scan.sql'
+         AND NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 3)`,
+    ).run();
+  }
+
   const applied = db.prepare('SELECT name FROM schema_migrations WHERE version = ?');
   const record = db.prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)');
 

@@ -138,6 +138,24 @@ const tablesSchema = z
             context.addIssue({ code: 'custom', message: 'Verbrauchskosten ohne Zählerart.' });
         }),
     ),
+    operating_cost_plans: z
+      .array(
+        z
+          .object({
+            ...base,
+            property_id: id,
+            tenancy_id: id,
+            year: z.number().int().min(1900).max(2200),
+            housing_costs_cents: cents,
+            garage_costs_cents: cents,
+            property_tax_cents: cents,
+            months: z.number().int().min(1).max(12),
+            monthly_prepayment_cents: cents.nullable(),
+            notes: z.string(),
+          })
+          .strict(),
+      )
+      .default([]),
     meters: z.array(
       z
         .object({
@@ -239,6 +257,7 @@ const exportOrder: TableName[] = [
   'units',
   'tenancies',
   'costs',
+  'operating_cost_plans',
   'meters',
   'readings',
   'payments',
@@ -281,6 +300,25 @@ function verifySemanticLinks(db: SqliteDatabase): void {
     .get() as { id: number } | undefined;
   if (invalidCost)
     throw new ApiError(400, `Kostenposition ${invalidCost.id} verweist auf ein anderes Objekt.`);
+
+  const invalidPlan = db
+    .prepare(
+      `
+    SELECT plan.id FROM operating_cost_plans plan
+    JOIN tenancies tenancy ON tenancy.id = plan.tenancy_id
+    JOIN units unit ON unit.id = tenancy.unit_id
+    WHERE unit.property_id <> plan.property_id
+       OR tenancy.start_date > printf('%04d-12-31', plan.year)
+       OR (tenancy.end_date IS NOT NULL AND tenancy.end_date < printf('%04d-01-01', plan.year))
+    LIMIT 1
+  `,
+    )
+    .get() as { id: number } | undefined;
+  if (invalidPlan)
+    throw new ApiError(
+      400,
+      `Betriebskosten-Wirtschaftsplan ${invalidPlan.id} passt nicht zum Objekt oder Mietzeitraum.`,
+    );
 
   const invalidSnapshot = db
     .prepare(

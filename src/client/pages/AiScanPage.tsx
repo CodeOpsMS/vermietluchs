@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { PageProps } from '../App';
 import { postJson } from '../api';
+import { AI_PROVIDER_LABELS as providerLabel } from '../../shared/ai';
 import {
   EmptyState,
   ErrorBox,
@@ -21,7 +22,6 @@ import type {
 type CostDraft = AiScanCost & { selected: boolean };
 type ReadingDraft = AiScanReading & { selected: boolean; meterId: string };
 
-const providerLabel = { openai: 'OpenAI', mistral: 'Mistral / Mixtral', ollama: 'Ollama' } as const;
 const allocationLabel = {
   area: 'Wohnfläche',
   persons: 'Personen',
@@ -84,6 +84,7 @@ export default function AiScanPage({
   );
 
   function chooseFile(next: File | null) {
+    if (busy) return;
     setError('');
     setMessage('');
     setResponse(null);
@@ -119,6 +120,9 @@ export default function AiScanPage({
     setBusy(true);
     setError('');
     setMessage('');
+    setResponse(null);
+    setCosts([]);
+    setReadings([]);
     try {
       const result = await postJson<AiScanResponse>('/api/ai/scan', {
         propertyId,
@@ -236,6 +240,7 @@ export default function AiScanPage({
         <Notice kind="warning">
           Dieses PDF wird zur Analyse an {providerLabel[aiSettings.provider]} übertragen. Lade nur
           Dokumente hoch, die du dort verarbeiten darfst.
+          {aiSettings.provider === 'compatible' && <> Ziel: {aiSettings.baseUrl}</>}
         </Notice>
       )}
 
@@ -267,11 +272,13 @@ export default function AiScanPage({
             className="file-input"
             type="file"
             accept="application/pdf,.pdf"
+            disabled={busy}
             onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
           />
           <button
             className="btn btn-secondary"
             type="button"
+            disabled={busy}
             onClick={() => fileRef.current?.click()}
           >
             PDF auswählen

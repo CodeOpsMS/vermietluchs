@@ -73,6 +73,83 @@ describe('Backup und Produktionsauslieferung', () => {
     expect(rows.body[0]).toMatchObject({ id: created.body.id, name: 'Bleibt erhalten' });
   });
 
+  test('Wirtschaftspläne werden gesichert und alte Backups ohne Plantabelle bleiben lesbar', async () => {
+    const createdProperty = (
+      await request(app).post('/api/properties').send(property('Planobjekt')).expect(201)
+    ).body;
+    const unit = (
+      await request(app)
+        .post('/api/units')
+        .send({
+          propertyId: createdProperty.id,
+          name: 'Wohnung 1',
+          floor: '',
+          areaSqm: 47.46,
+          unitWeight: 1,
+          notes: '',
+        })
+        .expect(201)
+    ).body;
+    const tenancy = (
+      await request(app)
+        .post('/api/tenancies')
+        .send({
+          unitId: unit.id,
+          tenantName: 'Mieter A',
+          tenantAddress: '',
+          startDate: '2023-01-01',
+          endDate: null,
+          persons: 1,
+          baseRent: 700,
+          utilityPrepayment: 150,
+          garagePrepayment: 0,
+          paymentDay: 3,
+          notes: '',
+        })
+        .expect(201)
+    ).body;
+    const plan = (
+      await request(app)
+        .post('/api/operating-cost-plans')
+        .send({
+          propertyId: createdProperty.id,
+          tenancyId: tenancy.id,
+          year: 2024,
+          housingCosts: 1883.45,
+          garageCosts: 8.24,
+          propertyTax: 106.29,
+          months: 12,
+          monthlyPrepayment: 150,
+          notes: 'Excel-Beispiel',
+        })
+        .expect(201)
+    ).body;
+
+    const exported = (await request(app).get('/api/backup/export').expect(200)).body;
+    expect(exported.tables.operating_cost_plans).toEqual([
+      expect.objectContaining({
+        id: plan.id,
+        housing_costs_cents: 188345,
+        monthly_prepayment_cents: 15000,
+      }),
+    ]);
+    await request(app)
+      .delete(`/api/operating-cost-plans/${plan.id}`)
+      .set('If-Match', '0')
+      .expect(204);
+    await request(app).post('/api/backup/import').send(exported).expect(200);
+    expect((await request(app).get('/api/operating-cost-plans').expect(200)).body[0]).toMatchObject(
+      {
+        annualTotal: 1997.98,
+        calculatedMonthlyAmount: 166.5,
+      },
+    );
+
+    delete exported.tables.operating_cost_plans;
+    await request(app).post('/api/backup/import').send(exported).expect(200);
+    expect((await request(app).get('/api/operating-cost-plans').expect(200)).body).toEqual([]);
+  });
+
   test('strukturell defekte Snapshot-Payloads werden trotz gültigem JSON abgelehnt', async () => {
     const created = await request(app)
       .post('/api/properties')

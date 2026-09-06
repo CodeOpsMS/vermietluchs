@@ -1,20 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AiProvider } from '../../shared/ai';
+import { AI_PROVIDERS } from '../../shared/ai';
 
-type StoredSecrets = Partial<Record<AiProvider, string>>;
+type StoredSecrets = Record<string, string>;
 
 export type AiSecretStore = {
-  has(provider: AiProvider): boolean;
-  read(provider: AiProvider): string | null;
-  write(provider: AiProvider, apiKey: string): void;
-  clear(provider: AiProvider): void;
+  has(scope: string): boolean;
+  read(scope: string): string | null;
+  write(scope: string, apiKey: string): void;
+  clear(scope: string): void;
 };
 
 export function createMemoryAiSecretStore(initial: StoredSecrets = {}): AiSecretStore {
-  const secrets = new Map<AiProvider, string>(
-    Object.entries(initial).filter((entry): entry is [AiProvider, string] => Boolean(entry[1])),
-  );
+  const secrets = new Map(Object.entries(initial).filter((entry) => Boolean(entry[1])));
   return {
     has: (provider) => secrets.has(provider),
     read: (provider) => secrets.get(provider) ?? null,
@@ -33,9 +31,13 @@ export function createFileAiSecretStore(dataDir: string): AiSecretStore {
       throw new Error('Der KI-Schlüsselspeicher ist beschädigt.');
     }
     const result: StoredSecrets = {};
-    for (const provider of ['openai', 'mistral', 'ollama'] as const) {
-      const value = (parsed as Record<string, unknown>)[provider];
-      if (typeof value === 'string' && value.trim()) result[provider] = value;
+    for (const [scope, value] of Object.entries(parsed)) {
+      if (
+        (AI_PROVIDERS.some((provider) => provider === scope) || scope.startsWith('compatible:')) &&
+        typeof value === 'string' &&
+        value.trim()
+      )
+        result[scope] = value;
     }
     return result;
   }

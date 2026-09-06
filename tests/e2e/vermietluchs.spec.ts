@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { textPdf } from '../helpers/pdf';
 
 type Created = { id: number; revision: number };
 
@@ -192,6 +193,44 @@ test.describe('Vermietluchs-Oberfläche', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Kosten 2024' })).toBeVisible();
     await page.locator('.brand').click();
     await expect(page.getByRole('heading', { level: 1, name: 'Cockpit 2024' })).toBeVisible();
+
+    await page.getByLabel('Abrechnungsjahr auswählen', { exact: true }).selectOption('2023');
+    await navigate(page, 'Wirtschaftsplan', 'Wirtschaftsplan 2024');
+    await page.getByRole('button', { name: 'Wirtschaftsplan anlegen', exact: true }).click();
+    let planDialog = page.getByRole('dialog', {
+      name: 'Betriebskosten-Wirtschaftsplan 2024',
+    });
+    await planDialog.getByLabel('Wohnungskosten', { exact: true }).fill('1.883,45');
+    await planDialog.getByLabel('Garagenkosten', { exact: true }).fill('8,24');
+    await planDialog.getByLabel('Grundsteuer', { exact: true }).fill('106,29');
+    await expect(
+      planDialog.locator('.plan-form-preview span').filter({ hasText: /^Jahresbetrag/ }),
+    ).toContainText(/1\.997,98\s*€/);
+    await expect(
+      planDialog.locator('.plan-form-preview span').filter({ hasText: /^Rechnerisch pro Monat/ }),
+    ).toContainText(/166,50\s*€/);
+    await planDialog
+      .getByRole('button', { name: 'Wirtschaftsplan speichern', exact: true })
+      .click();
+    const planPaper = page.locator('.operating-cost-plan-paper');
+    await expect(planPaper).toContainText('Betriebskosten nach Wirtschaftsplan 2024');
+    await expect(planPaper).toContainText(/1\.997,98\s*€/);
+    await expect(planPaper).toContainText(/166,50\s*€/);
+    await expect(planPaper).toContainText(/150,00\s*€/);
+    await page.getByRole('button', { name: 'Drucken', exact: true }).click();
+    expect(await page.evaluate(() => Reflect.get(globalThis, '__vermietluchsPrintCalled'))).toBe(
+      true,
+    );
+    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
+    planDialog = page.getByRole('dialog', { name: 'Betriebskosten-Wirtschaftsplan 2024' });
+    await planDialog
+      .getByLabel('Festgelegte monatliche Vorauszahlung', { exact: true })
+      .fill('166,50');
+    await planDialog
+      .getByRole('button', { name: 'Wirtschaftsplan speichern', exact: true })
+      .click();
+    await expect(planPaper).toContainText('entspricht dem rechnerischen Monatsbetrag');
+    await page.getByLabel('Abrechnungsjahr auswählen', { exact: true }).selectOption('2024');
 
     await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Manfred Lämmerzahl');
@@ -589,5 +628,90 @@ test.describe('Vermietluchs-Oberfläche', () => {
     await navigate(page, 'KI-Scan', /^KI-Scan \d{4}$/);
     await expect(page.getByRole('button', { name: 'PDF auswählen', exact: true })).toBeVisible();
     await expect(page.getByText(/prüfbaren Entwurf einlesen/)).toBeVisible();
+  });
+
+  test('konfiguriert eine universelle API und übernimmt einen geprüften Entwurf', async ({
+    page,
+  }) => {
+    const property = await sendJson<Created>(page.request, 'post', '/api/properties', {
+      name: 'KI-Testhaus',
+      address: '',
+      landlordName: null,
+      landlordAddress: null,
+      bankAccountHolder: null,
+      bankIban: null,
+      paymentDeadlineDays: null,
+    });
+    await page.goto('/');
+    await page
+      .getByRole('combobox', { name: 'Haus auswählen', exact: true })
+      .selectOption(String(property.id));
+    await page
+      .getByRole('combobox', { name: 'Abrechnungsjahr auswählen', exact: true })
+      .selectOption('2024');
+    await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
+    await page.getByRole('combobox', { name: 'Anbieter', exact: true }).selectOption('compatible');
+    await page.getByLabel('Modell', { exact: true }).fill('example/text-model');
+    await page.getByLabel('API-Adresse', { exact: false }).fill('http://localhost:1234/v1');
+    await expect(page.getByRole('combobox', { name: /^PDF-Eingabe/ })).toHaveValue('text');
+    await expect(page.getByRole('combobox', { name: /^JSON-Ausgabe/ })).toHaveValue('prompt');
+    await page.getByRole('checkbox', { name: 'KI-Scan aktivieren', exact: true }).check();
+    await page.getByRole('button', { name: 'KI-Einstellungen speichern', exact: true }).click();
+    await expect(page.getByText('KI-Einstellungen gespeichert.')).toBeVisible();
+    await page.reload();
+    await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
+    await expect(page.getByLabel('Modell', { exact: true })).toHaveValue('example/text-model');
+    await expect(page.getByRole('combobox', { name: /^PDF-Eingabe/ })).toHaveValue('text');
+    await navigate(page, 'KI-Scan', /^KI-Scan \d{4}$/);
+    let scanCount = 0;
+    await page.route('**/api/ai/scan', (route) => {
+      scanCount += 1;
+      if (scanCount === 2)
+        return route.fulfill({ status: 502, json: { error: 'Modell nicht erreichbar.' } });
+      return route.fulfill({
+        json: {
+          documentType: 'invoice',
+          detectedYear: 2024,
+          provider: 'compatible',
+          model: 'example/text-model',
+          fileName: 'test.pdf',
+          costs: [
+            {
+              description: 'KI-Test Hausreinigung',
+              amount: 42,
+              statementGroup: 'Wohnung',
+              allocationKey: 'area',
+              meterType: null,
+              labor35a: 0,
+              confidence: 0.9,
+              source: 'Seite 1',
+            },
+          ],
+          readings: [],
+          warnings: [],
+        },
+      });
+    });
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'test.pdf',
+      mimeType: 'application/pdf',
+      buffer: textPdf('Hausreinigung 42 Euro'),
+    });
+    await page.getByRole('button', { name: 'PDF analysieren', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'KI-Entwurf', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'PDF analysieren', exact: true }).click();
+    await expect(page.getByText('Modell nicht erreichbar.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'KI-Entwurf', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'PDF analysieren', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'KI-Entwurf', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Ausgewählte Daten übernehmen', exact: true }).click();
+    await expect(page.getByText(/1 Kostenposition\(en\).*wurden übernommen/)).toBeVisible();
+    const costs = await (await page.request.get('/api/costs')).json();
+    expect(
+      costs.find(
+        (cost: { descriptionInternal: string }) =>
+          cost.descriptionInternal === 'KI-Test Hausreinigung',
+      ),
+    ).toMatchObject({ sourceAmount: 42, tenantStatus: 'pending' });
   });
 });

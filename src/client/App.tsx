@@ -8,6 +8,7 @@ import type {
   AppData,
   Cost,
   Meter,
+  OperatingCostPlan,
   Payment,
   Property,
   Reading,
@@ -20,11 +21,20 @@ import CostsPage from './pages/CostsPage';
 import MetersPage from './pages/MetersPage';
 import RentPage from './pages/RentPage';
 import SettlementPage from './pages/SettlementPage';
+import OperatingCostPlanPage from './pages/OperatingCostPlanPage';
 import SettingsPage from './pages/SettingsPage';
 import AiScanPage from './pages/AiScanPage';
 
 export type PageId =
-  'cockpit' | 'properties' | 'costs' | 'meters' | 'rent' | 'ai-scan' | 'settlement' | 'settings';
+  | 'cockpit'
+  | 'properties'
+  | 'costs'
+  | 'meters'
+  | 'rent'
+  | 'ai-scan'
+  | 'settlement'
+  | 'operating-cost-plan'
+  | 'settings';
 
 const NAVIGATION_GROUPS: {
   label: string;
@@ -45,7 +55,10 @@ const NAVIGATION_GROUPS: {
   },
   {
     label: 'Abrechnen · Jahresende',
-    items: [{ id: 'settlement', label: 'Abrechnung' }],
+    items: [
+      { id: 'settlement', label: 'Abrechnung' },
+      { id: 'operating-cost-plan', label: 'Wirtschaftsplan' },
+    ],
   },
   {
     label: 'Einrichten · selten',
@@ -64,6 +77,7 @@ const EMPTY_DATA: AppData = {
   meters: [],
   readings: [],
   payments: [],
+  operatingCostPlans: [],
 };
 
 export default function App() {
@@ -89,18 +103,37 @@ export default function App() {
     else setInitialLoading(true);
     setError('');
     try {
-      const [properties, units, tenancies, costs, meters, readings, payments, loadedAiSettings] =
-        await Promise.all([
-          getJson<Property[]>('/api/properties'),
-          getJson<Unit[]>('/api/units'),
-          getJson<Tenancy[]>('/api/tenancies'),
-          getJson<Cost[]>('/api/costs'),
-          getJson<Meter[]>('/api/meters'),
-          getJson<Reading[]>('/api/readings'),
-          getJson<Payment[]>('/api/payments'),
-          getJson<AiSettings>('/api/ai/settings'),
-        ]);
-      setData({ properties, units, tenancies, costs, meters, readings, payments });
+      const [
+        properties,
+        units,
+        tenancies,
+        costs,
+        meters,
+        readings,
+        payments,
+        operatingCostPlans,
+        loadedAiSettings,
+      ] = await Promise.all([
+        getJson<Property[]>('/api/properties'),
+        getJson<Unit[]>('/api/units'),
+        getJson<Tenancy[]>('/api/tenancies'),
+        getJson<Cost[]>('/api/costs'),
+        getJson<Meter[]>('/api/meters'),
+        getJson<Reading[]>('/api/readings'),
+        getJson<Payment[]>('/api/payments'),
+        getJson<OperatingCostPlan[]>('/api/operating-cost-plans'),
+        getJson<AiSettings>('/api/ai/settings'),
+      ]);
+      setData({
+        properties,
+        units,
+        tenancies,
+        costs,
+        meters,
+        readings,
+        payments,
+        operatingCostPlans,
+      });
       setAiSettings(loadedAiSettings);
       setHasLoaded(true);
       loadedOnce.current = true;
@@ -152,6 +185,7 @@ export default function App() {
     data.costs.forEach((cost) => addYear(cost.year));
     data.payments.forEach((payment) => addYear(payment.dueDate));
     data.readings.forEach((reading) => addYear(reading.date));
+    data.operatingCostPlans.forEach((plan) => addYear(plan.year - 1));
     data.tenancies.forEach((tenancy) => {
       const startYear = Number(tenancy.startDate.slice(0, 4));
       const endYear = tenancy.endDate ? Number(tenancy.endDate.slice(0, 4)) : currentYear + 1;
@@ -161,7 +195,7 @@ export default function App() {
     });
     years.add(year);
     return [...years].sort((left, right) => right - left);
-  }, [data.costs, data.payments, data.readings, data.tenancies, year]);
+  }, [data.costs, data.operatingCostPlans, data.payments, data.readings, data.tenancies, year]);
   const filtered = useMemo<AppData>(() => {
     if (!propertyId)
       return {
@@ -172,6 +206,7 @@ export default function App() {
         meters: [],
         readings: [],
         payments: [],
+        operatingCostPlans: [],
       };
     const units = data.units.filter((unit) => unit.propertyId === propertyId);
     const unitIds = new Set(units.map((unit) => unit.id));
@@ -187,6 +222,7 @@ export default function App() {
       meters,
       readings: data.readings.filter((reading) => meterIds.has(reading.meterId)),
       payments: data.payments.filter((payment) => tenancyIds.has(payment.tenancyId)),
+      operatingCostPlans: data.operatingCostPlans.filter((plan) => plan.propertyId === propertyId),
     };
   }, [data, propertyId]);
 
@@ -243,7 +279,7 @@ export default function App() {
           <div className="sidebar-foot">
             <span className="local-dot" aria-hidden="true" />
             {aiSettings?.enabled && aiSettings.provider !== 'ollama'
-              ? 'KI-PDFs werden an die Cloud übertragen'
+              ? 'KI-Inhalte werden an die gewählte API übertragen'
               : 'Alle Daten bleiben lokal'}
           </div>
         </div>
@@ -323,6 +359,9 @@ export default function App() {
           )}
           {!initialLoading && hasLoaded && page === 'settlement' && (
             <SettlementPage key={pageScopeKey} {...pageProps} />
+          )}
+          {!initialLoading && hasLoaded && page === 'operating-cost-plan' && (
+            <OperatingCostPlanPage key={pageScopeKey} {...pageProps} />
           )}
           {!initialLoading && hasLoaded && page === 'settings' && (
             <SettingsPage key={scopeRevision} reload={loadAll} />

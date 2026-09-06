@@ -37,6 +37,7 @@ const domainTables = [
   'units',
   'tenancies',
   'costs',
+  'operating_cost_plans',
   'meters',
   'readings',
   'payments',
@@ -144,6 +145,17 @@ async function seedExampleData(): Promise<void> {
     garagePaid: 0,
     note: '',
   });
+  await post<Created>('/api/operating-cost-plans', {
+    propertyId: property.id,
+    tenancyId: tenancy.id,
+    year: 2024,
+    housingCosts: 1883.45,
+    garageCosts: 8.24,
+    propertyTax: 106.29,
+    months: 12,
+    monthlyPrepayment: 150,
+    notes: 'Reproduzierbares Beispiel',
+  });
   const meter = await post<Created>('/api/meters', {
     unitId: unit.id,
     name: 'Kaltwasser Bad',
@@ -178,6 +190,7 @@ async function assertExampleDatabase(): Promise<void> {
     units: 1,
     tenancies: 1,
     costs: 1,
+    operating_cost_plans: 1,
     meters: 1,
     readings: 2,
     payments: 1,
@@ -195,7 +208,7 @@ async function assertExampleDatabase(): Promise<void> {
 const health = await json<{ ok: boolean; database: string[]; schemaVersion: number }>(
   '/api/health',
 );
-assert.deepEqual(health, { ok: true, database: ['ok'], schemaVersion: 2 });
+assert.deepEqual(health, { ok: true, database: ['ok'], schemaVersion: 4 });
 
 await assertAiDisabledByDefault();
 await assertEmptyDatabase();
