@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { textPdf } from '../helpers/pdf';
 
 type Created = { id: number; revision: number };
 
@@ -594,5 +595,123 @@ test.describe('Vermietluchs-Oberfläche', () => {
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       ),
     ).toBe(true);
+  });
+
+  test('KI-Scan erscheint erst nach bewusster Aktivierung', async ({ page }) => {
+    const currentResponse = await page.request.get('/api/ai/settings');
+    const current = (await currentResponse.json()) as {
+      enabled: boolean;
+      provider: string;
+      model: string;
+      baseUrl: string;
+      revision: number;
+    };
+    if (current.enabled) {
+      await sendJson(page.request, 'put', '/api/ai/settings', {
+        enabled: false,
+        provider: current.provider,
+        model: current.model,
+        baseUrl: current.baseUrl,
+        clearApiKey: false,
+        revision: current.revision,
+      });
+    }
+
+    await page.goto('/');
+    const navigation = page.getByRole('navigation', { name: 'Hauptnavigation' });
+    await expect(navigation.getByRole('button', { name: 'KI-Scan', exact: true })).toHaveCount(0);
+    await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
+    await page.getByRole('checkbox', { name: 'KI-Scan aktivieren', exact: true }).check();
+    await page.getByRole('button', { name: 'KI-Einstellungen speichern', exact: true }).click();
+    await expect(page.getByText('KI-Einstellungen gespeichert.')).toBeVisible();
+    await expect(navigation.getByRole('button', { name: 'KI-Scan', exact: true })).toBeVisible();
+    await navigate(page, 'KI-Scan', /^KI-Scan \d{4}$/);
+    await expect(page.getByRole('button', { name: 'PDF auswählen', exact: true })).toBeVisible();
+    await expect(page.getByText(/prüfbaren Entwurf einlesen/)).toBeVisible();
+  });
+
+  test('konfiguriert eine universelle API und übernimmt einen geprüften Entwurf', async ({
+    page,
+  }) => {
+    const property = await sendJson<Created>(page.request, 'post', '/api/properties', {
+      name: 'KI-Testhaus',
+      address: '',
+      landlordName: null,
+      landlordAddress: null,
+      bankAccountHolder: null,
+      bankIban: null,
+      paymentDeadlineDays: null,
+    });
+    await page.goto('/');
+    await page
+      .getByRole('combobox', { name: 'Haus auswählen', exact: true })
+      .selectOption(String(property.id));
+    await page
+      .getByRole('combobox', { name: 'Abrechnungsjahr auswählen', exact: true })
+      .selectOption('2024');
+    await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
+    await page.getByRole('combobox', { name: 'Anbieter', exact: true }).selectOption('compatible');
+    await page.getByLabel('Modell', { exact: true }).fill('example/text-model');
+    await page.getByLabel('API-Adresse', { exact: false }).fill('http://localhost:1234/v1');
+    await expect(page.getByRole('combobox', { name: /^PDF-Eingabe/ })).toHaveValue('text');
+    await expect(page.getByRole('combobox', { name: /^JSON-Ausgabe/ })).toHaveValue('prompt');
+    await page.getByRole('checkbox', { name: 'KI-Scan aktivieren', exact: true }).check();
+    await page.getByRole('button', { name: 'KI-Einstellungen speichern', exact: true }).click();
+    await expect(page.getByText('KI-Einstellungen gespeichert.')).toBeVisible();
+    await page.reload();
+    await navigate(page, 'Einstellungen', 'Einstellungen & Backup');
+    await expect(page.getByLabel('Modell', { exact: true })).toHaveValue('example/text-model');
+    await expect(page.getByRole('combobox', { name: /^PDF-Eingabe/ })).toHaveValue('text');
+    await navigate(page, 'KI-Scan', /^KI-Scan \d{4}$/);
+    let scanCount = 0;
+    await page.route('**/api/ai/scan', (route) => {
+      scanCount += 1;
+      if (scanCount === 2)
+        return route.fulfill({ status: 502, json: { error: 'Modell nicht erreichbar.' } });
+      return route.fulfill({
+        json: {
+          documentType: 'invoice',
+          detectedYear: 2024,
+          provider: 'compatible',
+          model: 'example/text-model',
+          fileName: 'test.pdf',
+          costs: [
+            {
+              description: 'KI-Test Hausreinigung',
+              amount: 42,
+              statementGroup: 'Wohnung',
+              allocationKey: 'area',
+              meterType: null,
+              labor35a: 0,
+              confidence: 0.9,
+              source: 'Seite 1',
+            },
+          ],
+          readings: [],
+          warnings: [],
+        },
+      });
+    });
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'test.pdf',
+      mimeType: 'application/pdf',
+      buffer: textPdf('Hausreinigung 42 Euro'),
+    });
+    await page.getByRole('button', { name: 'PDF analysieren', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'KI-Entwurf', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'PDF analysieren', exact: true }).click();
+    await expect(page.getByText('Modell nicht erreichbar.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'KI-Entwurf', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'PDF analysieren', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'KI-Entwurf', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Ausgewählte Daten übernehmen', exact: true }).click();
+    await expect(page.getByText(/1 Kostenposition\(en\).*wurden übernommen/)).toBeVisible();
+    const costs = await (await page.request.get('/api/costs')).json();
+    expect(
+      costs.find(
+        (cost: { descriptionInternal: string }) =>
+          cost.descriptionInternal === 'KI-Test Hausreinigung',
+      ),
+    ).toMatchObject({ sourceAmount: 42, tenantStatus: 'pending' });
   });
 });

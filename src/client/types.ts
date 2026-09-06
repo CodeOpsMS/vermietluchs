@@ -9,6 +9,14 @@ import type {
   TenancyInput,
   UnitInput,
 } from '../shared/schemas';
+export type {
+  AiImportRequest,
+  AiProvider,
+  AiScanCost,
+  AiScanReading,
+  AiScanResponse,
+  AiSettings,
+} from '../shared/ai';
 
 export type EntityMeta = {
   id: number;

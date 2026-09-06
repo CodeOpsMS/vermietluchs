@@ -2,6 +2,9 @@
 
 Teile der fachlichen Abrechnungslogik und der zugehörigen Tests wurden aus dem
 Vorgängerprojekt „Mietfuchs“ übernommen und für Vermietluchs neu strukturiert.
+Der optionale Ollama-PDF-Scan folgt außerdem dessen Grundidee „strukturierter
+Entwurf plus manuelle Prüfung“, wurde für Vermietluchs aber als eigener
+Mehr-Provider-, Sicherheits- und Importpfad neu implementiert.
 
 ## Mietfuchs
 

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createFileAiSecretStore } from './ai/secrets';
 import { createApp } from './app';
 import { openDatabase } from './database';
 
@@ -16,6 +17,7 @@ const app = createApp({
   db,
   staticDir: path.resolve(process.cwd(), 'dist/client'),
   allowedHosts: [host, ...allowedHosts],
+  aiSecretStore: createFileAiSecretStore(dataDir),
 });
 
 const server = app.listen(port, host, () => {
