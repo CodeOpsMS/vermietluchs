@@ -83,11 +83,19 @@ export default function PaymentTable({
               {payments.map((payment) => {
                 const tenancy = tenancies.find((item) => item.id === payment.tenancyId);
                 const unit = units.find((item) => item.id === tenancy?.unitId);
-                const due = payment.baseRentDue + payment.utilityDue + payment.garageDue;
+                const dueCents =
+                  Math.round(payment.baseRentDue * 100) +
+                  Math.round(payment.utilityDue * 100) +
+                  Math.round(payment.garageDue * 100);
+                const due = dueCents / 100;
                 const parts = getPaidParts(payment);
                 const utilityPaid = parts.utilityPaid + parts.garagePaid;
                 const status =
-                  payment.amountPaid >= due ? 'paid' : payment.amountPaid > 0 ? 'partial' : 'open';
+                  Math.round(payment.amountPaid * 100) >= dueCents
+                    ? 'paid'
+                    : payment.amountPaid > 0
+                      ? 'partial'
+                      : 'open';
 
                 return (
                   <tr key={payment.id}>

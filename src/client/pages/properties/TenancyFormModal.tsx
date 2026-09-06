@@ -38,9 +38,7 @@ export default function TenancyFormModal({
         <label className="field">
           Personen
           <input
-            type="number"
-            min="1"
-            step="0.5"
+            inputMode="decimal"
             value={form.persons}
             onChange={(event) => onChange({ ...form, persons: event.target.value })}
           />

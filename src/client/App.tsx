@@ -82,6 +82,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [scopeRevision, setScopeRevision] = useState(0);
   const loadedOnce = useRef(false);
+  const loadRequestId = useRef(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(readInitialTheme);
   const [year, setYear] = useState(new Date().getFullYear());
@@ -91,6 +92,7 @@ export default function App() {
   });
 
   async function loadAll() {
+    const requestId = ++loadRequestId.current;
     if (loadedOnce.current) setRefreshing(true);
     else setInitialLoading(true);
     setError('');
@@ -106,6 +108,8 @@ export default function App() {
           getJson<Payment[]>('/api/payments'),
           getJson<OperatingCostPlan[]>('/api/operating-cost-plans'),
         ]);
+      // Nur der zuletzt gestartete Abruf darf Daten und Auswahl ersetzen.
+      if (requestId !== loadRequestId.current) return;
       setData({
         properties,
         units,
@@ -123,16 +127,27 @@ export default function App() {
         return stillExists ? current : (properties[0]?.id ?? null);
       });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Der Server ist nicht erreichbar.');
+      if (requestId === loadRequestId.current) {
+        setError(reason instanceof Error ? reason.message : 'Der Server ist nicht erreichbar.');
+      }
     } finally {
-      setInitialLoading(false);
-      setRefreshing(false);
+      if (requestId === loadRequestId.current) {
+        setInitialLoading(false);
+        setRefreshing(false);
+      }
     }
   }
 
   useEffect(() => {
     // Der erste Ladevorgang startet nach dem initialen Render.
-    void Promise.resolve().then(loadAll);
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) void loadAll();
+    });
+    return () => {
+      cancelled = true;
+      loadRequestId.current += 1;
+    };
   }, []);
   useEffect(() => {
     const handleConflict = () => {

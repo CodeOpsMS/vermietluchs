@@ -197,8 +197,7 @@ export default function ChangeoverModal({
         <label className="field">
           Personen
           <input
-            type="number"
-            min="1"
+            inputMode="decimal"
             value={nextTenancy.persons}
             onChange={(event) => updateNextTenancy({ persons: event.target.value })}
           />
