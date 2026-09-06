@@ -199,6 +199,20 @@ test.describe('Vermietluchs-Oberfläche', () => {
     let planDialog = page.getByRole('dialog', {
       name: 'Betriebskosten-Wirtschaftsplan 2024',
     });
+    await planDialog.getByLabel('Wohnungskosten', { exact: true }).fill('100');
+    await planDialog
+      .getByLabel('Festgelegte monatliche Vorauszahlung', { exact: true })
+      .fill('abc');
+    await planDialog
+      .getByRole('button', { name: 'Wirtschaftsplan speichern', exact: true })
+      .click();
+    await expect(planDialog.locator('.field-error')).toContainText('Bitte alle Beträge');
+    await planDialog
+      .getByLabel('Festgelegte monatliche Vorauszahlung', { exact: true })
+      .fill('150');
+    await planDialog.getByLabel('Wohnungskosten', { exact: true }).fill('50000000000000');
+    await planDialog.getByLabel('Garagenkosten', { exact: true }).fill('50000000000000');
+    await expect(planDialog.locator('.plan-form-preview')).toContainText('—');
     await planDialog.getByLabel('Wohnungskosten', { exact: true }).fill('1.883,45');
     await planDialog.getByLabel('Garagenkosten', { exact: true }).fill('8,24');
     await planDialog.getByLabel('Grundsteuer', { exact: true }).fill('106,29');
