@@ -3,6 +3,10 @@
 Stand: 30. August 2026. Die Suite umfasst 22 Vitest-Dateien mit 201 Tests, zwei
 Chromium-End-to-End-Szenarien und zwei Tests des gebauten Container-Images.
 
+Der [Review vom 7. September 2026](CODE_REVIEW_2026-09-07.md) dokumentiert
+zusätzliche Regressionen auf getrennten Verbesserungsbranches sowie deren
+gemeinsam geprüften Stand. Die Testanzahl hängt bis zum Merge vom Branch ab.
+
 ## Prüfungen
 
 | Ebene                       | Schwerpunkt                                                            | Befehl                  |
