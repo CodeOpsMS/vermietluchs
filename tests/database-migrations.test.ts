@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { runMigrations, type SqliteDatabase } from '../src/server/database';
+import { openDatabase, runMigrations, type SqliteDatabase } from '../src/server/database';
 
 describe('Datenbankmigrationen', () => {
   let directory: string;
@@ -80,4 +80,70 @@ describe('Datenbankmigrationen', () => {
       total: 1,
     });
   });
+
+  test('ergänzt KI-Einstellungen in einer bestehenden Datenbank ohne Fachdaten zu verändern', () => {
+    db.close();
+    const oldMigrations = path.join(directory, 'old-migrations');
+    fs.mkdirSync(oldMigrations);
+    fs.copyFileSync(
+      path.resolve('migrations/001_initial.sql'),
+      path.join(oldMigrations, '001_initial.sql'),
+    );
+    const filename = path.join(directory, 'existing.sqlite');
+    db = openDatabase(filename, { migrationsDir: oldMigrations });
+    db.prepare("INSERT INTO properties (name, address) VALUES ('Bleibt', 'Musterweg 1')").run();
+    db.close();
+
+    db = openDatabase(filename, { migrationsDir: path.resolve('migrations') });
+
+    expect(db.prepare('SELECT name, address FROM properties').all()).toEqual([
+      { name: 'Bleibt', address: 'Musterweg 1' },
+    ]);
+    expect(db.prepare('SELECT enabled, provider FROM ai_settings WHERE id = 1').get()).toEqual({
+      enabled: 0,
+      provider: 'ollama',
+    });
+    expect(db.prepare('SELECT max(version) AS version FROM schema_migrations').get()).toEqual({
+      version: 4,
+    });
+  });
+
+  test.each(['main', 'ai-branch'] as const)(
+    'aktualisiert %s-Datenbanken ohne Verlust und bleibt idempotent',
+    (source) => {
+      for (const name of [
+        '001_initial.sql',
+        source === 'main' ? '002_operating_cost_plans.sql' : '003_ai_scan.sql',
+      ]) {
+        fs.copyFileSync(
+          path.resolve('migrations', name),
+          path.join(directory, name === '003_ai_scan.sql' ? '002_ai_scan.sql' : name),
+        );
+      }
+      runMigrations(db, directory);
+      db.prepare("INSERT INTO properties (name, address) VALUES ('Bestand', 'Bleibt')").run();
+      if (source === 'ai-branch')
+        db.prepare(
+          "UPDATE ai_settings SET enabled = 1, model = 'existing-model', revision = 7",
+        ).run();
+
+      runMigrations(db, path.resolve('migrations'));
+      runMigrations(db, path.resolve('migrations'));
+
+      expect(db.prepare('SELECT name FROM properties').get()).toEqual({ name: 'Bestand' });
+      expect(db.prepare('SELECT name FROM schema_migrations ORDER BY version').all()).toEqual([
+        { name: '001_initial.sql' },
+        { name: '002_operating_cost_plans.sql' },
+        { name: '003_ai_scan.sql' },
+        { name: '004_ai_compatible.sql' },
+      ]);
+      expect(db.prepare('SELECT count(*) AS total FROM operating_cost_plans').get()).toEqual({
+        total: 0,
+      });
+      if (source === 'ai-branch')
+        expect(
+          db.prepare('SELECT enabled, model, revision, document_mode FROM ai_settings').get(),
+        ).toEqual({ enabled: 1, model: 'existing-model', revision: 7, document_mode: 'auto' });
+    },
+  );
 });

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { DISABLED_AI_SETTINGS } from '../helpers/ai-settings';
 
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-09-07T08:00:00Z'));
@@ -55,6 +56,7 @@ test.beforeEach(async ({ page }) => {
         '/api/units': [unit],
         '/api/tenancies': [tenancy],
         '/api/payments': payments,
+        '/api/ai/settings': DISABLED_AI_SETTINGS,
       };
       await route.fulfill({ json: data[path] ?? [] });
     }

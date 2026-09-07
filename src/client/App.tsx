@@ -4,6 +4,7 @@ import { ErrorBox, Loading } from './components/Common';
 import ThemeToggle from './components/ThemeToggle';
 import { applyTheme, readInitialTheme, type ThemeMode } from './theme';
 import type {
+  AiSettings,
   AppData,
   Cost,
   Meter,
@@ -22,18 +23,23 @@ import RentPage from './pages/RentPage';
 import SettlementPage from './pages/SettlementPage';
 import OperatingCostPlanPage from './pages/OperatingCostPlanPage';
 import SettingsPage from './pages/SettingsPage';
+import AiScanPage from './pages/AiScanPage';
 
-type PageId =
+export type PageId =
   | 'cockpit'
   | 'properties'
   | 'costs'
   | 'meters'
   | 'rent'
+  | 'ai-scan'
   | 'settlement'
   | 'operating-cost-plan'
   | 'settings';
 
-const NAVIGATION_GROUPS: { label: string; items: { id: PageId; label: string }[] }[] = [
+const NAVIGATION_GROUPS: {
+  label: string;
+  items: { id: PageId; label: string; requiresAi?: boolean }[];
+}[] = [
   {
     label: 'Übersicht',
     items: [{ id: 'cockpit', label: 'Cockpit' }],
@@ -44,6 +50,7 @@ const NAVIGATION_GROUPS: { label: string; items: { id: PageId; label: string }[]
       { id: 'meters', label: 'Zähler & Ablesungen' },
       { id: 'costs', label: 'Kosten' },
       { id: 'rent', label: 'Mietkonto' },
+      { id: 'ai-scan', label: 'KI-Scan', requiresAi: true },
     ],
   },
   {
@@ -76,6 +83,7 @@ const EMPTY_DATA: AppData = {
 export default function App() {
   const [page, setPage] = useState<PageId>('cockpit');
   const [data, setData] = useState<AppData>(EMPTY_DATA);
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -97,18 +105,28 @@ export default function App() {
     else setInitialLoading(true);
     setError('');
     try {
-      const [properties, units, tenancies, costs, meters, readings, payments, operatingCostPlans] =
-        await Promise.all([
-          getJson<Property[]>('/api/properties'),
-          getJson<Unit[]>('/api/units'),
-          getJson<Tenancy[]>('/api/tenancies'),
-          getJson<Cost[]>('/api/costs'),
-          getJson<Meter[]>('/api/meters'),
-          getJson<Reading[]>('/api/readings'),
-          getJson<Payment[]>('/api/payments'),
-          getJson<OperatingCostPlan[]>('/api/operating-cost-plans'),
-        ]);
-      // Nur der zuletzt gestartete Abruf darf Daten und Auswahl ersetzen.
+      const [
+        properties,
+        units,
+        tenancies,
+        costs,
+        meters,
+        readings,
+        payments,
+        operatingCostPlans,
+        loadedAiSettings,
+      ] = await Promise.all([
+        getJson<Property[]>('/api/properties'),
+        getJson<Unit[]>('/api/units'),
+        getJson<Tenancy[]>('/api/tenancies'),
+        getJson<Cost[]>('/api/costs'),
+        getJson<Meter[]>('/api/meters'),
+        getJson<Reading[]>('/api/readings'),
+        getJson<Payment[]>('/api/payments'),
+        getJson<OperatingCostPlan[]>('/api/operating-cost-plans'),
+        getJson<AiSettings>('/api/ai/settings'),
+      ]);
+      // Nur der zuletzt gestartete Abruf darf Daten, KI-Einstellungen und Auswahl ersetzen.
       if (requestId !== loadRequestId.current) return;
       setData({
         properties,
@@ -120,6 +138,7 @@ export default function App() {
         payments,
         operatingCostPlans,
       });
+      setAiSettings(loadedAiSettings);
       setHasLoaded(true);
       loadedOnce.current = true;
       setPropertyId((current) => {
@@ -250,18 +269,20 @@ export default function App() {
           {NAVIGATION_GROUPS.map((group) => (
             <div className="navigation-group" key={group.label}>
               <p className="nav-category">{group.label}</p>
-              {group.items.map((item) => (
-                <button
-                  key={item.id}
-                  className={page === item.id ? 'active' : ''}
-                  type="button"
-                  aria-current={page === item.id ? 'page' : undefined}
-                  onClick={() => navigate(item.id)}
-                >
-                  <span className="nav-dot" aria-hidden="true" />
-                  <span>{item.label}</span>
-                </button>
-              ))}
+              {group.items
+                .filter((item) => !item.requiresAi || aiSettings?.enabled)
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    className={page === item.id ? 'active' : ''}
+                    type="button"
+                    aria-current={page === item.id ? 'page' : undefined}
+                    onClick={() => navigate(item.id)}
+                  >
+                    <span className="nav-dot" aria-hidden="true" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
             </div>
           ))}
         </nav>
@@ -272,7 +293,9 @@ export default function App() {
           />
           <div className="sidebar-foot">
             <span className="local-dot" aria-hidden="true" />
-            Alle Daten bleiben lokal
+            {aiSettings?.enabled && aiSettings.provider !== 'ollama'
+              ? 'KI-Inhalte werden an die gewählte API übertragen'
+              : 'Alle Daten bleiben lokal'}
           </div>
         </div>
       </aside>
@@ -345,6 +368,9 @@ export default function App() {
           )}
           {!initialLoading && hasLoaded && page === 'rent' && (
             <RentPage key={pageScopeKey} {...pageProps} />
+          )}
+          {!initialLoading && hasLoaded && page === 'ai-scan' && aiSettings?.enabled && (
+            <AiScanPage key={pageScopeKey} {...pageProps} aiSettings={aiSettings} />
           )}
           {!initialLoading && hasLoaded && page === 'settlement' && (
             <SettlementPage key={pageScopeKey} {...pageProps} />

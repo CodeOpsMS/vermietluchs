@@ -23,6 +23,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:ai": "vitest run tests/ai.test.ts tests/ai-providers.test.ts",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
@@ -32,6 +33,7 @@
   "dependencies": {
     "better-sqlite3": "13.0.3",
     "express": "5.2.1",
+    "pdf-parse": "2.4.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "3.25.67"

@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { DISABLED_AI_SETTINGS } from '../helpers/ai-settings';
 
 async function refresh(page: Page) {
   await page.evaluate(() => window.dispatchEvent(new Event('vermietluchs:data-conflict')));
@@ -33,7 +34,10 @@ for (const scenario of [
     let propertyRequests = 0;
     const pending: Route[] = [];
     await page.route('**/api/**', async (route) => {
-      if (new URL(route.request().url()).pathname !== '/api/properties') {
+      const path = new URL(route.request().url()).pathname;
+      if (path === '/api/ai/settings') {
+        await route.fulfill({ json: DISABLED_AI_SETTINGS });
+      } else if (path !== '/api/properties') {
         await route.fulfill({ json: [] });
       } else if (++propertyRequests === 1) {
         await route.fulfill({ json: [{ id: 1, name: 'Ausgangsstand' }] });
