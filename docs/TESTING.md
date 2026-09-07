@@ -1,9 +1,15 @@
 # Teststrategie
 
-Stand: 6. September 2026. Die Suite umfasst zusätzlich gezielte Tests der
-KI-Provider, Sicherheitsgrenzen und des transaktionalen Imports sowie ein
-Chromium-Szenario für die optionale Navigation, den Wirtschaftsplan und zwei
-Tests des gebauten Container-Images.
+Stand: 7. September 2026. Der KI-Scan-Main umfasst 261 Vitest-Tests und vier
+Chromium-Szenarien. Die Tests prüfen unter anderem KI-Provider,
+Sicherheitsgrenzen, transaktionalen Import, optionale Navigation und
+Wirtschaftsplan. Zusätzlich sind zwei Tests des gebauten Container-Images
+vorgesehen.
+
+Der [Review vom 7. September 2026](CODE_REVIEW_2026-09-07.md) dokumentiert
+zusätzliche Regressionen auf getrennten Verbesserungsbranches und die erneute
+Gegenprüfung nach PR #19: kombiniert 276 Vitest-Tests und 16 Chromium-Szenarien.
+Die Testanzahl hängt bis zum Merge vom Branch ab.
 
 ## Prüfungen
 

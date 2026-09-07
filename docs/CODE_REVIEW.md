@@ -1,5 +1,8 @@
 # Code-Review und Testbericht
 
+Aktueller projektweiter Folge-Review: [7. September 2026](CODE_REVIEW_2026-09-07.md).
+Der folgende Bericht dokumentiert den historischen Stand vom August.
+
 Stand: 27. August 2026, Ausgangsstand `27cbf14`. Geprüft wurden Client,
 Express-API, SQLite-Persistenz, Fachlogik, Backup, Tests, Docker und GitHub
 Actions.
