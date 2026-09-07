@@ -10,6 +10,7 @@ Browser
   └─ React 19 → REST/JSON
                  └─ Express 5 → Zod 3 → Fachlogik
                                              └─ better-sqlite3 13 → SQLite-Datei
+                 └─ optionaler KI-Scan → OpenAI / Mistral / lokales Ollama
 ```
 
 | Paket                | Version | Aufgabe                                            |
@@ -18,10 +19,12 @@ Browser
 | `express`            |   5.2.1 | HTTP-API und Auslieferung des gebauten Clients     |
 | `zod`                | 3.25.67 | Validierung gemeinsamer API-Eingaben und Snapshots |
 | `better-sqlite3`     |  13.0.3 | Synchroner, nativer Zugriff auf SQLite             |
+| `pdf-parse`          |   2.4.5 | Lokale PDF-Text- und Seitenextraktion für Ollama   |
 
 Der Produktionscontainer benötigt Node.js 24, Linux und ein beschreibbares
-Volume unter `/data`. Es gibt keine externe Datenbank, Telemetrie oder
-Cloud-Laufzeitabhängigkeit.
+Volume unter `/data`. Es gibt keine externe Datenbank oder Telemetrie. Nur bei
+bewusst aktiviertem OpenAI- oder Mistral-Scan besteht eine
+Cloud-Laufzeitabhängigkeit; Ollama kann vollständig lokal laufen.
 
 ## Entwicklungs- und Build-Werkzeuge
 
@@ -34,8 +37,8 @@ Cloud-Laufzeitabhängigkeit.
 - Prettier, ESLint und die React-Lint-Plugins erzwingen den Stil.
 - Docker Buildx erzeugt die Linux-Images für AMD64 und ARM64.
 
-`npm audit --json` erfasst 453 Abhängigkeiten insgesamt: 75 für die Produktion,
-379 für die Entwicklung und 81 optionale beziehungsweise plattformabhängige
+`npm audit --json` erfasst 466 Abhängigkeiten insgesamt: 76 für die Produktion,
+379 für die Entwicklung und 91 optionale beziehungsweise plattformabhängige
 Abhängigkeiten; die Kategorien können sich überschneiden. Der Audit vom 7. September 2026 meldet nach der gezielten Aktualisierung von `qs` auf 6.16.0
 keine bekannte Schwachstelle. Das ist eine zeitabhängige Prüfung der
 Abhängigkeiten, keine Sicherheitsgarantie für die gesamte Anwendung.
@@ -43,8 +46,10 @@ Abhängigkeiten, keine Sicherheitsgarantie für die gesamte Anwendung.
 Die zuvor festgeschriebene Version `qs` 6.15.3 war von zwei moderaten Meldungen betroffen:
 [GHSA-x5fp-wj9c-mxmx](https://github.com/advisories/GHSA-x5fp-wj9c-mxmx) und
 [GHSA-4mjr-xmp4-gh2g](https://github.com/advisories/GHSA-4mjr-xmp4-gh2g).
-Die Aktualisierung betrifft nur diesen transitiven Lockfile-Eintrag, ohne neue
-direkte Abhängigkeiten oder Major-Upgrades. Eine Ausnutzung über die konkrete
+Das Update auf `qs` 6.16.0 ist durch den KI-Scan-Merge (PR #19) bereits in
+`main` enthalten. Der aktualisierte Sicherheits-Branch verändert die Lockdatei
+gegenüber diesem Main daher nicht mehr; die PDF-Abhängigkeiten bleiben erhalten.
+Eine Ausnutzung über die konkrete
 Vermietluchs-Konfiguration wurde nicht nachgewiesen.
 
 `@vitest/coverage-v8` ist mit `3.2.7` exakt an die eingesetzte Vitest-Version

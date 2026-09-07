@@ -24,6 +24,8 @@ Jahren Programmiererfahrung gut nachvollziehbar bleibt.
 - Abrechnungen prüfen, unveränderlich abschließen und im Browser drucken
 - Betriebskosten-Wirtschaftspläne für das Folgejahr nach Wohnung, Garage und Grundsteuer erfassen, monatlich umrechnen und drucken
 - alle Daten als JSON sichern und transaktional wiederherstellen
+- optional PDFs mit OpenAI, Mistral/Mixtral oder einer lokalen Ollama-Instanz
+  analysieren und Kosten/Zählerstände nach manueller Prüfung übernehmen
 
 ## Schnellstart mit Docker
 
@@ -139,6 +141,56 @@ werden. Der alte Stand bleibt bis zum erneuten, atomaren Abschluss erhalten.
 Eine Prüfsumme verhindert, dass zwischen Vorschau und Abschluss unbemerkt
 geänderte Daten gespeichert werden.
 
+## Optionaler KI-Scan
+
+Der KI-Scan ist standardmäßig ausgeschaltet. Unter **Einstellungen → KI-Scan**
+wählst du einen der unterstützten Wege:
+
+- **Ollama** arbeitet über eine lokale Instanz. Beim Docker-Betrieb ist als
+  Adresse häufig `http://host.docker.internal:11434` passend; alternativ wird
+  eine private LAN-IP akzeptiert. Die mitgelieferte Compose-Datei richtet den
+  Hostnamen auch unter Linux über das Docker-Host-Gateway ein.
+- **OpenAI** verwendet ausschließlich `https://api.openai.com/v1`.
+- **Mistral / Mixtral** verwendet ausschließlich
+  `https://api.mistral.ai/v1`; das konkrete Auswertungsmodell bleibt wählbar.
+- **OpenAI-kompatible API** bietet dieselbe PDF-Eingabe für weitere Modelle:
+  Basis-URL einschließlich API-Pfad (z. B. `http://localhost:1234/v1`), Modell-ID
+  und bei Bedarf API-Schlüssel eintragen. Der Server muss `/chat/completions`
+  unterstützen. Öffentliche Ziele benötigen HTTPS; lokale/private Ziele dürfen
+  HTTP verwenden. Gespeicherte Schlüssel sind an die jeweilige API-Adresse gebunden.
+
+Bei Ollama und kompatiblen APIs lassen sich Eingabe und Ausgabe an das Modell
+anpassen: **Nur Text** funktioniert mit Textmodellen und PDFs mit Textschicht.
+**Automatisch** ergänzt Seiten mit wenig Text durch Bilder; **Alle Seiten als
+Bilder** erfasst auch visuelle Tabellen. Beide Bildmodi benötigen ein Modell
+mit Bildverständnis. Gescannte PDFs benötigen im Textmodus vorher OCR.
+Für die Ausgabe stehen **Striktes JSON-Schema**, **JSON-Modus** und **Nur Prompt**
+zur Verfügung. Der Prompt-Modus vermeidet optionale API-Parameter; auch dort
+wird die Antwort vollständig validiert. Eine beliebige native Anbieter-API
+ohne Chat-Completions-Kompatibilität benötigt einen eigenen Adapter oder ein Gateway.
+Das entspricht der Trennung zwischen JSON-Modus und Schema-Ausgabe in der
+[OpenAI-Dokumentation](https://developers.openai.com/api/docs/guides/structured-outputs).
+
+Lokale Extraktion und Mistral-OCR verarbeiten höchstens 120.000 Textzeichen;
+lokale Bildanalyse höchstens 12 benötigte Seitenbilder. Größere Dokumente
+werden mit einem Hinweis zum Aufteilen abgelehnt, nicht still gekürzt.
+
+Nach dem Speichern kann die Verbindung mit dem eingebauten Test geprüft werden.
+Bei kompatiblen APIs sendet dieser Test einen kurzen Textaufruf, der beim
+Anbieter Kosten verursachen kann. Die PDF- und Formatunterstützung wird erst
+beim Scan geprüft.
+Erst bei aktivierter Funktion erscheint **KI-Scan** in der Navigation. Dort
+werden PDFs bis 20 MB analysiert. Das Ergebnis ist immer nur ein bearbeitbarer
+Entwurf: Du wählst Kosten und Zählerstände einzeln aus und ordnest erkannte
+Zähler einem bereits vorhandenen Zähler zu. Kosten werden als offene
+Prüfentscheidung angelegt. Die KI erzeugt niemals Mieter, Mietverhältnisse,
+Zahlungen oder Abrechnungen.
+
+API-Schlüssel liegen mit Dateirechten `0600` in `/data/ai-secrets.json`. Sie
+werden weder über die API zurückgegeben noch in der SQLite-Datenbank oder im
+JSON-Backup gespeichert. Wer ein Backup auf einem neuen System einspielt, muss
+den Schlüssel deshalb neu hinterlegen.
+
 ## Ordnerstruktur
 
 ```text
@@ -179,9 +231,12 @@ setzt du `VERMIETLUCHS_ALLOWED_HOSTS=nas.example.lan`.
 
 ## Datenschutz und Verantwortung
 
-Alle Daten bleiben in deiner lokalen SQLite-Datei. Die App nutzt keine Cloud,
-keine Telemetrie und keine KI-Dienste. Prüfe Betriebskostenabrechnungen vor dem
-Versand trotzdem fachlich und rechtlich; Vermietluchs ersetzt keine Rechts- oder
+Ohne aktivierten KI-Scan bleiben alle Fachdaten lokal; Vermietluchs nutzt keine
+Telemetrie. Bei Ollama bleibt die Verarbeitung bei der konfigurierten lokalen
+Instanz. Bei OpenAI oder Mistral wird das ausgewählte PDF bewusst an den
+jeweiligen Cloud-Anbieter übertragen. Dessen Datenschutz- und
+Aufbewahrungsregeln gelten. Prüfe KI-Ergebnisse und Betriebskostenabrechnungen
+immer fachlich und rechtlich; Vermietluchs ersetzt keine Rechts- oder
 Steuerberatung.
 
 ## Lizenz
