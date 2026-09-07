@@ -31,7 +31,10 @@ export function createEmptyOperatingCostPlanForm(
   tenancy: Tenancy | undefined,
 ): OperatingCostPlanForm {
   const currentPrepayment =
-    tenancy === undefined ? 0 : tenancy.utilityPrepayment + tenancy.garagePrepayment;
+    tenancy === undefined
+      ? 0
+      : (Math.round(tenancy.utilityPrepayment * 100) + Math.round(tenancy.garagePrepayment * 100)) /
+        100;
   return {
     housingCosts: '',
     garageCosts: '0',
@@ -75,7 +78,7 @@ export function parseOperatingCostPlanForm(
     !validMoney(housingCosts) ||
     !validMoney(garageCosts) ||
     !validMoney(propertyTax) ||
-    (monthlyPrepayment !== null && !validMoney(monthlyPrepayment)) ||
+    (form.monthlyPrepayment.trim() !== '' && !validMoney(monthlyPrepayment)) ||
     !Number.isInteger(months) ||
     months < 1 ||
     months > 12
@@ -83,10 +86,15 @@ export function parseOperatingCostPlanForm(
     return null;
   }
 
+  const housingCostsCents = Math.round(housingCosts * 100);
+  const garageCostsCents = Math.round(garageCosts * 100);
+  const propertyTaxCents = Math.round(propertyTax * 100);
+  if (!Number.isSafeInteger(housingCostsCents + garageCostsCents + propertyTaxCents)) return null;
+
   const calculated = calculateOperatingCostPlan({
-    housingCostsCents: Math.round(housingCosts * 100),
-    garageCostsCents: Math.round(garageCosts * 100),
-    propertyTaxCents: Math.round(propertyTax * 100),
+    housingCostsCents,
+    garageCostsCents,
+    propertyTaxCents,
     months,
     monthlyPrepaymentCents: monthlyPrepayment === null ? null : Math.round(monthlyPrepayment * 100),
   });

@@ -4,6 +4,7 @@ import type { SqliteDatabase } from '../database';
 import { ApiError } from '../errors';
 import { optionalId, parseId, requireRevision, revisionFromIfMatch } from '../http';
 import { centsToEuros, eurosToCents } from '../money';
+import { validateTenancyYearReferences } from '../tenancy-period';
 import {
   decodeBase,
   deleteRow,
@@ -128,6 +129,7 @@ export function registerTenancyRoutes(router: Router, db: SqliteDatabase): void 
         'Ein bestehendes Mietverhältnis kann nicht in eine andere Wohnung verschoben werden.',
       );
     }
+    validateTenancyYearReferences(db, id, input.startDate, input.endDate);
     validateExistingPaymentPeriod(db, id, input);
     const row = updateRow(
       db,
