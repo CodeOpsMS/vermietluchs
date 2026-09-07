@@ -1,5 +1,5 @@
 import { ConfirmButton, EmptyState, StatusPill } from '../../components/Common';
-import { dateDe, euro, today } from '../../format';
+import { dateDe, euro, number, today } from '../../format';
 import type { Property, Tenancy, Unit } from '../../types';
 
 type UnitsSectionProps = {
@@ -86,7 +86,7 @@ export default function UnitsSection({
                   <b>{unit.areaSqm.toLocaleString('de-DE')} m²</b> Fläche
                 </span>
                 <span>
-                  <b>{unit.unitWeight}</b> Einheitengewicht
+                  <b>{number(unit.unitWeight)}</b> Einheitengewicht
                 </span>
               </div>
 
