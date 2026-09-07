@@ -1,6 +1,50 @@
 # Projektweiter Code-Review — 7. September 2026
 
-## Ausgangsstand und Umfang
+## Aktualisierung nach dem KI-Scan-Merge
+
+Der neue Main `f47d92cc23fbc5e6e0e026951f0832546d3e4d94` enthält PR #19
+(KI-PDF-Scan, universelle Modelleingabe) und ist als `v0.0.8` markiert.
+Er wurde in die beiden betroffenen Review-Branches gemergt; die bestehende
+Historie bleibt erhalten. Die anderen zwei Review-Branches sind unverändert
+und lassen sich weiterhin konfliktfrei ergänzen.
+
+- `codex/review-client-consistency`, Merge-Commit `bf82b97`: `loadAll()` lädt
+  weiterhin die KI-Einstellungen und prüft die Request-ID, bevor Fachdaten,
+  KI-Einstellungen oder Auswahl aktualisiert werden. Die vier zusätzlichen
+  KI-Nachladetests sind jetzt dauerhaft enthalten. Bestehende Browser-Mocks
+  liefern außerdem ein korrekt geformtes KI-Einstellungsobjekt.
+- `codex/review-dependency-security`, Merge-Commit `2dd6833`: der Konflikt in
+  `docs/DEPENDENCIES.md` ist aufgelöst. Die neuen PDF-Abhängigkeiten und der
+  zusätzliche KI-CI-Schritt bleiben erhalten. `qs` 6.16.0 ist bereits im neuen
+  Main enthalten; die aktuelle Lockdatei hat deshalb keine Differenz zu Main.
+  Die drei Action-Pins bleiben zusätzliche Änderungen dieses Branches.
+
+Nach frischer Installation mit `npm ci` wurden die Branches einzeln und in
+einem separaten Detached-Worktree gemeinsam geprüft:
+
+| Stand                                    | Unit-/API-Tests | Chromium-Szenarien |
+| ---------------------------------------- | --------------: | -----------------: |
+| Aktualisierter Client-Branch             |             261 |                 16 |
+| Aktualisierter Sicherheits-Branch        |             261 |                  4 |
+| Alle vier Review-Branches mit neuem Main |             276 |                 16 |
+
+Alle Prüfungen bestanden. `npm run check` umfasst Formatierung, TypeScript,
+ESLint, Coverage-Schwellen und Produktionsbuild. Der erneute Audit der
+gemeinsamen Lockdatei meldet 0 bekannte Schwachstellen bei 466 Abhängigkeiten.
+Die Kombination der Code-Stände `bf82b97`, `2dd6833`, `bd8dbb9` und `7877b77`
+ergab ohne weitere Konfliktauflösung den lokalen Testcommit `bcc6c91`.
+Dieser Bericht ist die anschließende, separat formatgeprüfte Dokumentation.
+
+Es wurden keine Live-Daten verwendet und keine externen KI-Aufrufe durchgeführt.
+Main, Release-Tags und Deployment wurden nicht geändert. Docker-Build und
+Container-Smoke-Tests müssen weiterhin in der PR-CI ausgeführt werden; lokal
+ist keine Docker-CLI verfügbar. Ein Feature-Branch-Push allein startet im
+bestehenden Workflow keinen CI-Lauf, sofern kein Pull Request offen ist.
+
+Die folgenden Abschnitte dokumentieren den ursprünglichen Review vor PR #19;
+ihre Basis- und Testzahlen sind historische Ergebnisse.
+
+## Ursprünglicher Ausgangsstand und Umfang
 
 Basis ist der frisch abgerufene `origin/main`-Commit
 `df5fa54c25ff4a1acd0172b1198d526a48be9723`, einschließlich Wirtschaftsplan und
