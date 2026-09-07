@@ -8,6 +8,38 @@ import {
 import type { OperatingCostPlan, Tenancy } from '../src/client/types';
 
 describe('Betriebskosten-Wirtschaftsplan', () => {
+  test('unterscheidet eine leere Vorauszahlung von einer ungültigen Eingabe', () => {
+    const form = { ...createEmptyOperatingCostPlanForm(undefined), housingCosts: '100' };
+    for (const monthlyPrepayment of ['abc', '1,2,3', '-1', '1,234']) {
+      expect(parseOperatingCostPlanForm({ ...form, monthlyPrepayment })).toBeNull();
+    }
+    expect(parseOperatingCostPlanForm({ ...form, monthlyPrepayment: '   ' })).toMatchObject({
+      monthlyPrepayment: null,
+    });
+    expect(parseOperatingCostPlanForm({ ...form, monthlyPrepayment: '0' })).toMatchObject({
+      monthlyPrepayment: 0,
+    });
+  });
+
+  test('summiert die Vertragsvorauszahlungen ohne sichtbare Gleitkommareste', () => {
+    expect(
+      createEmptyOperatingCostPlanForm({
+        utilityPrepayment: 0.1,
+        garagePrepayment: 0.2,
+      } as Tenancy).monthlyPrepayment,
+    ).toBe('0,3');
+  });
+
+  test('lehnt einen überlaufenden Jahresbetrag ab, ohne das Formular zum Absturz zu bringen', () => {
+    expect(
+      parseOperatingCostPlanForm({
+        ...createEmptyOperatingCostPlanForm(undefined),
+        housingCosts: '50000000000000',
+        garageCosts: '50000000000000',
+      }),
+    ).toBeNull();
+  });
+
   test('bildet das Excel-Beispiel für 2023 centgenau ab', () => {
     expect(
       calculateOperatingCostPlan({

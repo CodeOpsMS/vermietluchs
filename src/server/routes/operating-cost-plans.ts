@@ -29,13 +29,20 @@ const planColumns = [
 ] as const;
 
 function encodePlan(value: OperatingCostPlanInput): DatabaseValues {
+  const housingCostsCents = eurosToCents(value.housingCosts);
+  const garageCostsCents = eurosToCents(value.garageCosts);
+  const propertyTaxCents = eurosToCents(value.propertyTax);
+  // Auch die Summe muss vor INSERT/UPDATE sicher sein, nicht erst beim Lesen.
+  if (!Number.isSafeInteger(housingCostsCents + garageCostsCents + propertyTaxCents)) {
+    throw new ApiError(400, 'Der Jahresbetrag überschreitet den sicheren Zahlenbereich.');
+  }
   return {
     property_id: value.propertyId,
     tenancy_id: value.tenancyId,
     year: value.year,
-    housing_costs_cents: eurosToCents(value.housingCosts),
-    garage_costs_cents: eurosToCents(value.garageCosts),
-    property_tax_cents: eurosToCents(value.propertyTax),
+    housing_costs_cents: housingCostsCents,
+    garage_costs_cents: garageCostsCents,
+    property_tax_cents: propertyTaxCents,
     months: value.months,
     monthly_prepayment_cents:
       value.monthlyPrepayment === null ? null : eurosToCents(value.monthlyPrepayment),

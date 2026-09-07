@@ -12,7 +12,7 @@ const id = z.number().int().positive();
 const revision = z.number().int().nonnegative();
 const timestamp = z.string().min(1).max(50);
 const date = dateSchema;
-const cents = z.number().int().nonnegative();
+const cents = z.number().int().nonnegative().safe();
 const base = {
   id,
   revision,
@@ -153,7 +153,14 @@ const tablesSchema = z
             monthly_prepayment_cents: cents.nullable(),
             notes: z.string(),
           })
-          .strict(),
+          .strict()
+          .refine(
+            (row) =>
+              Number.isSafeInteger(
+                row.housing_costs_cents + row.garage_costs_cents + row.property_tax_cents,
+              ),
+            'Der Jahresbetrag überschreitet den sicheren Zahlenbereich.',
+          ),
       )
       .default([]),
     meters: z.array(
