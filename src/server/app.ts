@@ -10,6 +10,7 @@ import { registerChangeoverRoute } from './changeovers';
 import { registerDashboardRoute } from './dashboard';
 import { errorHandler, notFoundHandler } from './errors';
 import { requireAllowedHost, sameOriginWrites } from './http';
+import { createLogger, requestLogging, type AppLogger } from './logging';
 import { registerPaymentGenerationRoute } from './payment-generation';
 import { registerResourceRoutes } from './routes';
 import { sqliteSettlementCalculator } from './settlement-calculator';
@@ -24,11 +25,13 @@ export type AppOptions = {
   allowedHosts?: string[];
   aiSecretStore?: AiSecretStore;
   aiProviderService?: AiProviderService;
+  logger?: AppLogger;
 };
 
 export function createApp(options: AppOptions) {
   const app = express();
   app.disable('x-powered-by');
+  app.use(requestLogging(options.logger ?? createLogger()));
   app.use((_request, response, next) => {
     response.setHeader(
       'Content-Security-Policy',
