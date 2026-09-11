@@ -7,6 +7,8 @@ import { activeInYear, parseGermanNumber } from '../format';
 import { CostFormModal } from './costs/CostFormModal';
 import { CostList } from './costs/CostList';
 import { CostMetrics } from './costs/CostMetrics';
+import DocumentLinksModal from '../components/DocumentLinksModal';
+import type { Cost } from '../types';
 import {
   createCostFormForEditing,
   createEmptyCostForm,
@@ -19,6 +21,7 @@ export default function CostsPage({ data, propertyId, year, reload }: PageProps)
   const [form, setForm] = useState<CostForm | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [documentCost, setDocumentCost] = useState<Cost | null>(null);
 
   const yearCosts = useMemo(
     () => data.costs.filter((cost) => cost.year === year),
@@ -149,6 +152,7 @@ export default function CostsPage({ data, propertyId, year, reload }: PageProps)
         onViewChange={setView}
         onCreate={() => setForm(createEmptyCostForm())}
         onEdit={(cost) => setForm(createCostFormForEditing(cost))}
+        onDocuments={setDocumentCost}
         onDelete={(cost) =>
           run(async () => {
             await deleteJson(`/api/costs/${cost.id}`, cost.revision);
@@ -156,6 +160,15 @@ export default function CostsPage({ data, propertyId, year, reload }: PageProps)
         }
       />
 
+      {documentCost && (
+        <DocumentLinksModal
+          key={documentCost.id}
+          propertyId={documentCost.propertyId}
+          costId={documentCost.id}
+          title={`Belege · ${documentCost.descriptionInternal}`}
+          onClose={() => setDocumentCost(null)}
+        />
+      )}
       {form && (
         <CostFormModal
           form={form}

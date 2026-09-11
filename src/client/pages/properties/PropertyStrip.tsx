@@ -6,6 +6,7 @@ type PropertyStripProps = {
   units: Unit[];
   selectedPropertyId: number | null;
   onEdit: (property: Property) => void;
+  onDocuments: (property: Property) => void;
   onDelete: (property: Property) => void | Promise<void>;
 };
 
@@ -14,6 +15,7 @@ export default function PropertyStrip({
   units,
   selectedPropertyId,
   onEdit,
+  onDocuments,
   onDelete,
 }: PropertyStripProps) {
   return (
@@ -36,6 +38,13 @@ export default function PropertyStrip({
               </small>
             </div>
             <span className="row-actions">
+              <button
+                className="btn btn-secondary"
+                aria-label={`Dokumente für ${property.name}`}
+                onClick={() => onDocuments(property)}
+              >
+                Dokumente
+              </button>
               <button
                 className="icon-button"
                 type="button"

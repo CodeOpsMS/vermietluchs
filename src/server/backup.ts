@@ -7,6 +7,7 @@ import { backupSchema, dateSchema } from '../shared/schemas';
 import type { SqliteDatabase } from './database';
 import { ApiError, asyncHandler } from './errors';
 import { settlementPayloadSchema } from './settlements';
+import { papraBaseUrlSchema, papraIdSchema } from '../shared/papra';
 
 const id = z.number().int().positive();
 const revision = z.number().int().nonnegative();
@@ -22,6 +23,50 @@ const base = {
 
 const tablesSchema = z
   .object({
+    papra_settings: z
+      .array(
+        z
+          .object({
+            id: z.literal(1),
+            base_url: z.union([z.literal(''), papraBaseUrlSchema]),
+            public_url: z.union([z.literal(''), papraBaseUrlSchema]),
+            enabled: z.union([z.literal(0), z.literal(1)]),
+            revision,
+            updated_at: timestamp,
+          })
+          .strict(),
+      )
+      .length(1),
+    papra_property_mappings: z.array(
+      z
+        .object({
+          id,
+          property_id: id,
+          base_url: papraBaseUrlSchema,
+          organization_id: z.union([z.literal(''), papraIdSchema]),
+          revision,
+        })
+        .strict(),
+    ),
+    document_links: z.array(
+      z
+        .object({
+          id,
+          property_id: id,
+          cost_id: id.nullable(),
+          base_url: papraBaseUrlSchema,
+          public_url: papraBaseUrlSchema,
+          organization_id: papraIdSchema,
+          document_id: papraIdSchema,
+          name: z.string().min(1).max(1000),
+          mime_type: z.string().min(1).max(255),
+          original_name: z.string().min(1).max(1000),
+          original_size: cents,
+          sha256: z.string().regex(/^[a-f0-9]{64}$/),
+          created_at: timestamp,
+        })
+        .strict(),
+    ),
     app_settings: z
       .array(
         z
@@ -269,6 +314,9 @@ const exportOrder: TableName[] = [
   'readings',
   'payments',
   'settlement_snapshots',
+  'papra_settings',
+  'papra_property_mappings',
+  'document_links',
 ];
 const deleteOrder = [...exportOrder].reverse();
 
@@ -353,7 +401,11 @@ async function createSafetyBackup(db: SqliteDatabase): Promise<string> {
   return filename;
 }
 
-export function registerBackupRoutes(router: Router, db: SqliteDatabase): void {
+export function registerBackupRoutes(
+  router: Router,
+  db: SqliteDatabase,
+  resetPapraSecrets?: () => void,
+): void {
   router.get('/backup/export', (_request, response) => {
     const backup = {
       schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -372,7 +424,25 @@ export function registerBackupRoutes(router: Router, db: SqliteDatabase): void {
     '/backup/import',
     asyncHandler(async (request, response) => {
       const envelope = backupSchema.parse(request.body);
-      const tables = tablesSchema.parse(envelope.tables);
+      const tables = tablesSchema.parse(
+        envelope.schemaVersion === 1
+          ? {
+              ...envelope.tables,
+              papra_settings: [
+                {
+                  id: 1,
+                  base_url: '',
+                  public_url: '',
+                  enabled: 0,
+                  revision: 0,
+                  updated_at: new Date().toISOString(),
+                },
+              ],
+              papra_property_mappings: [],
+              document_links: [],
+            }
+          : envelope.tables,
+      );
       const safetyBackup = await createSafetyBackup(db);
 
       try {
@@ -388,6 +458,8 @@ export function registerBackupRoutes(router: Router, db: SqliteDatabase): void {
               foreignKeyErrors,
             );
           verifySemanticLinks(db);
+          db.prepare('UPDATE papra_settings SET enabled = 0').run();
+          resetPapraSecrets?.();
         })();
       } catch (error) {
         if (error instanceof ApiError) throw error;

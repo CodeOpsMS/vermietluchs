@@ -16,6 +16,9 @@ import { ApiError, asyncHandler } from '../errors';
 import { eurosToCents } from '../money';
 import type { AiProviderService, AiRuntimeSettings } from './providers';
 import type { AiSecretStore } from './secrets';
+import { papraScanSchema } from '../../shared/papra';
+import type { PapraService } from '../papra/service';
+import { responseSignal } from '../papra/routes';
 
 type AiSettingsRow = {
   enabled: number;
@@ -141,6 +144,7 @@ function propertyName(db: SqliteDatabase, propertyId: number): string {
 export type AiRouteOptions = {
   secretStore: AiSecretStore;
   service: AiProviderService;
+  papra: PapraService;
 };
 
 export function registerAiRoutes(
@@ -241,26 +245,84 @@ export function registerAiRoutes(
     }),
   );
 
-  router.post('/ai/import', (request, response) => {
-    const input = aiImportRequestSchema.parse(request.body);
-    const current = settingsRow(db);
-    if (current.enabled !== 1) {
-      throw new ApiError(403, 'Der KI-Scan ist in den Einstellungen nicht aktiviert.');
-    }
-    propertyName(db, input.propertyId);
-    const imported = importProposal(db, input, current);
-    response.status(201).json({
-      ...imported,
-      costsCreated: imported.costIds.length,
-      readingsCreated: imported.readingIds.length,
-    });
-  });
+  router.post(
+    '/ai/scan/papra',
+    asyncHandler(async (request, response) => {
+      const input = papraScanSchema.parse(request.body);
+      const current = settingsRow(db);
+      if (current.enabled !== 1)
+        throw new ApiError(403, 'Der KI-Scan ist in den Einstellungen nicht aktiviert.');
+      const file = await options.papra.scanFile(
+        input.propertyId,
+        input.selection,
+        responseSignal(response),
+      );
+      if (settingsRow(db).revision !== current.revision || settingsRow(db).enabled !== 1)
+        throw new ApiError(
+          409,
+          'Die KI-Einstellungen wurden während des Dateiabrufs geändert. Bitte erneut starten.',
+        );
+      const result = await options.service.scanPdf(
+        runtimeSettings(current),
+        options.secretStore.read(
+          secretScope(current.provider, safeProviderBaseUrl(current.provider, current.base_url)),
+        ),
+        file.pdf,
+        {
+          fileName: file.fileName,
+          propertyName: propertyName(db, input.propertyId),
+          year: input.year,
+        },
+      );
+      options.papra.assertSelection(input.propertyId, input.selection);
+      response.json({
+        ...result,
+        provider: current.provider,
+        model: current.model,
+        fileName: file.fileName,
+        papraSource: file.source,
+      });
+    }),
+  );
+
+  router.post(
+    '/ai/import',
+    asyncHandler(async (request, response) => {
+      const input = aiImportRequestSchema.parse(request.body);
+      const current = settingsRow(db);
+      if (current.enabled !== 1) {
+        throw new ApiError(403, 'Der KI-Scan ist in den Einstellungen nicht aktiviert.');
+      }
+      propertyName(db, input.propertyId);
+      const verified = input.papraSource
+        ? await options.papra.verifySource(
+            input.propertyId,
+            input.papraSource,
+            responseSignal(response),
+          )
+        : undefined;
+      if (settingsRow(db).enabled !== 1) throw new ApiError(403, 'Der KI-Scan wurde deaktiviert.');
+      if (verified) input.fileName = verified.document.originalName.slice(0, 255);
+      const imported = importProposal(
+        db,
+        input,
+        current,
+        verified ? (costId) => options.papra.link(input.propertyId, costId, verified) : undefined,
+      );
+      response.status(201).json({
+        ...imported,
+        costsCreated: imported.costIds.length,
+        readingsCreated: imported.readingIds.length,
+      });
+    }),
+  );
 }
 
 function importProposal(
   db: SqliteDatabase,
   input: ReturnType<typeof aiImportRequestSchema.parse>,
   settings: AiSettingsRow,
+  linkCost?: (costId: number) => void,
 ): { costIds: number[]; readingIds: number[] } {
   const insertCost = db.prepare(
     `INSERT INTO costs (
@@ -317,6 +379,7 @@ function importProposal(
         scanNote(cost.source),
       );
       costIds.push(Number(result.lastInsertRowid));
+      linkCost?.(Number(result.lastInsertRowid));
     }
 
     for (const reading of input.readings) {

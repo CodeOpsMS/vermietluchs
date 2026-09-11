@@ -3,7 +3,10 @@ import path from 'node:path';
 import { createFileAiSecretStore } from './ai/secrets';
 import { createApp } from './app';
 import { openDatabase } from './database';
+import { createLogger } from './logging';
+import { createFilePapraSecretStore } from './papra/secrets';
 
+const logger = createLogger();
 const dataDir = path.resolve(process.env.VERMIETLUCHS_DATA_DIR ?? path.join(process.cwd(), 'data'));
 fs.mkdirSync(dataDir, { recursive: true });
 const db = openDatabase(path.join(dataDir, 'vermietluchs.sqlite'));
@@ -14,19 +17,29 @@ const allowedHosts = (process.env.VERMIETLUCHS_ALLOWED_HOSTS ?? '')
   .map((value) => value.trim())
   .filter(Boolean);
 const app = createApp({
+  logger,
   db,
   staticDir: path.resolve(process.cwd(), 'dist/client'),
   allowedHosts: [host, ...allowedHosts],
   aiSecretStore: createFileAiSecretStore(dataDir),
+  papraSecretStore: createFilePapraSecretStore(dataDir),
 });
 
 const server = app.listen(port, host, () => {
-  console.log(`Vermietluchs läuft unter http://${host}:${port}`);
+  logger.log('info', 'server.started', {
+    host,
+    port,
+    version: process.env.VERMIETLUCHS_VERSION ?? 'development',
+    logLevel: logger.level,
+    logValues: logger.values,
+  });
 });
 
 function shutdown(): void {
+  logger.log('info', 'server.stopping');
   server.close(() => {
     db.close();
+    logger.log('info', 'server.stopped');
     process.exit(0);
   });
 }

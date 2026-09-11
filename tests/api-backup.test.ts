@@ -38,7 +38,7 @@ describe('Backup und Produktionsauslieferung', () => {
     await request(app).post('/api/properties').send(property('Gesichert')).expect(201);
     const exported = await request(app).get('/api/backup/export').expect(200);
     expect(exported.headers['content-disposition']).toContain('vermietluchs-backup-');
-    expect(exported.body).toMatchObject({ schemaVersion: 1, app: 'Vermietluchs' });
+    expect(exported.body).toMatchObject({ schemaVersion: 2, app: 'Vermietluchs' });
 
     await request(app).post('/api/properties').send(property('Nach Export')).expect(201);
     const restored = await request(app).post('/api/backup/import').send(exported.body).expect(200);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-type Mode = 'empty' | 'example';
+type Mode = 'empty' | 'example' | 'upgrade';
 type Created = { id: number; revision: number };
 type Backup = {
   schemaVersion: number;
@@ -11,8 +11,8 @@ type Backup = {
 const mode = process.argv[2] as Mode | undefined;
 const baseUrl = process.argv[3]?.replace(/\/$/, '');
 
-if ((mode !== 'empty' && mode !== 'example') || !baseUrl) {
-  throw new Error('Aufruf: container-image-smoke.ts <empty|example> <base-url>');
+if ((mode !== 'empty' && mode !== 'example' && mode !== 'upgrade') || !baseUrl) {
+  throw new Error('Aufruf: container-image-smoke.ts <empty|example|upgrade> <base-url>');
 }
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
@@ -46,9 +46,12 @@ const domainTables = [
 
 async function readBackup(): Promise<Backup> {
   const backup = await json<Backup>('/api/backup/export');
-  assert.equal(backup.schemaVersion, 1);
+  assert.equal(backup.schemaVersion, 2);
   assert.equal(backup.app, 'Vermietluchs');
   assert.equal(backup.tables.app_settings.length, 1);
+  assert.equal(backup.tables.papra_settings.length, 1);
+  assert.deepEqual(backup.tables.papra_property_mappings, []);
+  assert.deepEqual(backup.tables.document_links, []);
   assert.equal(
     backup.tables.ai_settings,
     undefined,
@@ -208,17 +211,38 @@ async function assertExampleDatabase(): Promise<void> {
 const health = await json<{ ok: boolean; database: string[]; schemaVersion: number }>(
   '/api/health',
 );
-assert.deepEqual(health, { ok: true, database: ['ok'], schemaVersion: 4 });
+assert.deepEqual(health, { ok: true, database: ['ok'], schemaVersion: 5 });
 
 await assertAiDisabledByDefault();
-await assertEmptyDatabase();
+const papra = await json<{ connected: boolean; apiKeyConfigured: boolean }>('/api/papra/settings');
+assert.equal(papra.connected, false);
+assert.equal(papra.apiKeyConfigured, false);
+if (mode === 'upgrade') {
+  const backup = await readBackup();
+  assert.equal(backup.tables.properties.length, 1);
+  assert.equal(backup.tables.costs.length, 1);
+  const property = backup.tables.properties[0] as Record<string, unknown>;
+  assert.equal(property.name, 'Bestand vor Papra');
+  assert.equal(property.revision, 9);
+  const cost = backup.tables.costs[0] as Record<string, unknown>;
+  assert.equal(cost.id, 29);
+  assert.equal(cost.property_id, 17);
+  assert.equal(cost.source_amount_cents, 123456);
+  assert.equal(cost.allocable_amount_cents, 123456);
+  assert.equal(cost.revision, 7);
+  const ai = await json<{ model: string; revision: number }>('/api/ai/settings');
+  assert.equal(ai.model, 'existing-model');
+  assert.equal(ai.revision, 11);
+} else await assertEmptyDatabase();
 if (mode === 'example') {
   await seedExampleData();
   await assertExampleDatabase();
 }
 
 console.log(
-  mode === 'empty'
-    ? 'Leerer Container enthält keine fachlichen Daten.'
-    : 'Container verarbeitet die reproduzierbaren Beispieldaten für 2023.',
+  mode === 'upgrade'
+    ? 'Container migriert Schema 4 und erhält Häuser, Kosten und KI-Einstellungen.'
+    : mode === 'empty'
+      ? 'Leerer Container enthält keine fachlichen Daten.'
+      : 'Container verarbeitet die reproduzierbaren Beispieldaten für 2023.',
 );
