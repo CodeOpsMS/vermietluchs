@@ -84,7 +84,7 @@ export default function PapraSettingsCard() {
             <input
               type="url"
               value={settings.baseUrl}
-              placeholder="http://192.168.2.240:1221"
+              placeholder="https://papra.example.org"
               disabled={busy}
               onChange={(event) =>
                 setSettings({ ...settings, baseUrl: event.target.value, connected: false })
@@ -98,7 +98,7 @@ export default function PapraSettingsCard() {
               aria-label="Papra-Adresse im Browser"
               value={settings.publicUrl}
               disabled={busy}
-              placeholder="z. B. http://192.168.2.240:1221"
+              placeholder="z. B. https://papra.example.org"
               onChange={(event) => setSettings({ ...settings, publicUrl: event.target.value })}
             />
             <small>

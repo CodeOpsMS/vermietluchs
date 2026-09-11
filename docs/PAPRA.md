@@ -12,7 +12,7 @@ Papra; Vermietluchs speichert nur Quellenreferenzen und Dateimetadaten.
    Verbindung prüfen. Die Adresse muss aus dem Container erreichbar sein;
    `localhost` bezeichnet innerhalb eines Containers diesen Container selbst.
    Bei einer internen Docker-Adresse wie `http://papra:1221` zusätzlich die
-   **Papra-Adresse im Browser** eintragen, etwa `http://192.168.2.240:1221`.
+   **Papra-Adresse im Browser** eintragen, etwa `https://papra.example.org`.
    Nur die interne API-Adresse erhält den Schlüssel. Beide Container müssen
    für den Docker-Namen im selben Docker-Netz liegen.
 3. Unter Stammdaten → Dokumente → Papra-Organisation für dieses Haus die
@@ -123,8 +123,7 @@ Das Papra-Original hatte danach dieselbe SHA-256-Prüfsumme. Die Testdatenbank
 lag ausschließlich im Arbeitsspeicher; temporärer Leseschlüssel und Testdateien
 wurden anschließend entfernt.
 
-Beide Container verwenden das bestehende Docker-Netz `mainnet`. Für API-Zugriffe
-funktioniert `http://papra:1221`; der Weg aus dem Container über die LAN-Adresse
-lief in eine Zeitüberschreitung. Die Browser-Adresse lautet
-`http://192.168.2.240:1221`. Die produktive Vermietluchs-Installation wurde bei
-diesem Test weder aktualisiert noch neu konfiguriert.
+Der Praxistest bestätigte die getrennte Verwendung einer internen Docker-Adresse
+für API-Aufrufe und einer vom Browser erreichbaren Adresse für Papra-Links.
+Die produktive Vermietluchs-Installation wurde bei diesem Test weder aktualisiert
+noch neu konfiguriert.
