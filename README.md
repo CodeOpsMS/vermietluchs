@@ -26,6 +26,8 @@ Jahren Programmiererfahrung gut nachvollziehbar bleibt.
 - alle Daten als JSON sichern und transaktional wiederherstellen
 - optional PDFs mit OpenAI, Mistral/Mixtral oder einer lokalen Ollama-Instanz
   analysieren und Kosten/Zählerstände nach manueller Prüfung übernehmen
+- Papra-Dokumente mit Häusern und Kosten verknüpfen und PDFs direkt aus Papra
+  in den KI-Scan übernehmen; die Originaldateien bleiben in Papra
 
 ## Schnellstart mit Docker
 
@@ -123,6 +125,26 @@ Logs deshalb vor einem Update sichern oder extern sammeln. Die Logs sind ein
 Betriebsprotokoll und kein unveränderliches Änderungsarchiv. Frühere Aktionen,
 die Version `0.0.9` nicht protokolliert hat, lassen sich damit nicht nachträglich
 anzeigen.
+
+## Dokumente aus Papra
+
+Unter **Einstellungen → Papra** die aus dem Vermietluchs-Container erreichbare
+Papra-Adresse und einen API-Schlüssel mit `organizations:read` und
+`documents:read` hinterlegen und **Verbindung prüfen** auswählen. Anschließend
+unter **Stammdaten → Dokumente** für jedes Haus seine Papra-Organisation festlegen.
+
+Unter **Kosten → Belege** und bei den Häusern lassen sich mehrere Dokumente
+verknüpfen. PDFs öffnen direkt über Vermietluchs oder werden heruntergeladen.
+**KI-Scan → Aus Papra auswählen** lädt ein PDF ohne manuellen Download in die
+Analyse. Erst nach Prüfung und Bestätigung werden Kosten angelegt und mit dem
+Papra-Original verknüpft. Es werden keine Dokumente in Papra verändert oder gelöscht.
+
+Der Schlüssel liegt separat in `/data/papra-secrets.json` mit Dateirechten 0600.
+JSON-Backups enthalten die Zuordnungen, jedoch weder Schlüssel noch Originaldateien.
+Nach einem Restore muss die Papra-Verbindung erneut eingerichtet werden.
+Ein eigenes Papra-Backup bleibt erforderlich.
+
+Einrichtung, API-Verhalten und Integrationstest: [Papra-Anbindung](docs/PAPRA.md).
 
 ## Releases und Container-Paket
 

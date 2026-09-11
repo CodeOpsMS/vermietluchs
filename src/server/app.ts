@@ -17,6 +17,10 @@ import { sqliteSettlementCalculator } from './settlement-calculator';
 import type { SettlementCalculator } from './settlements';
 import { registerSettlementRoutes } from './settlements';
 import { registerSettingsRoutes } from './settings';
+import { createPapraClient, type PapraClient } from './papra/client';
+import { createPapraService } from './papra/service';
+import { registerPapraRoutes } from './papra/routes';
+import { createMemoryPapraSecretStore, type PapraSecretStore } from './papra/secrets';
 
 export type AppOptions = {
   db: SqliteDatabase;
@@ -26,6 +30,8 @@ export type AppOptions = {
   aiSecretStore?: AiSecretStore;
   aiProviderService?: AiProviderService;
   logger?: AppLogger;
+  papraClient?: PapraClient;
+  papraSecretStore?: PapraSecretStore;
 };
 
 export function createApp(options: AppOptions) {
@@ -68,10 +74,15 @@ export function createApp(options: AppOptions) {
     });
   });
   api.use(sameOriginWrites);
+  const papraClient = options.papraClient ?? createPapraClient();
+  const papraSecrets = options.papraSecretStore ?? createMemoryPapraSecretStore();
+  const papra = createPapraService(options.db, papraClient, papraSecrets);
+  registerPapraRoutes(api, options.db, papra, papraClient, papraSecrets);
   registerSettingsRoutes(api, options.db);
   registerAiRoutes(api, options.db, {
     secretStore: options.aiSecretStore ?? createMemoryAiSecretStore(),
     service: options.aiProviderService ?? createAiProviderService(),
+    papra,
   });
   registerResourceRoutes(api, options.db);
   registerPaymentGenerationRoute(api, options.db);
@@ -84,7 +95,7 @@ export function createApp(options: AppOptions) {
       ? undefined
       : (options.settlementCalculator ?? sqliteSettlementCalculator),
   );
-  registerBackupRoutes(api, options.db);
+  registerBackupRoutes(api, options.db, () => papraSecrets.clear());
   api.use(notFoundHandler);
   app.use('/api', api);
 

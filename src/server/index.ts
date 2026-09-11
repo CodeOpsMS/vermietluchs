@@ -4,6 +4,7 @@ import { createFileAiSecretStore } from './ai/secrets';
 import { createApp } from './app';
 import { openDatabase } from './database';
 import { createLogger } from './logging';
+import { createFilePapraSecretStore } from './papra/secrets';
 
 const logger = createLogger();
 const dataDir = path.resolve(process.env.VERMIETLUCHS_DATA_DIR ?? path.join(process.cwd(), 'data'));
@@ -21,6 +22,7 @@ const app = createApp({
   staticDir: path.resolve(process.cwd(), 'dist/client'),
   allowedHosts: [host, ...allowedHosts],
   aiSecretStore: createFileAiSecretStore(dataDir),
+  papraSecretStore: createFilePapraSecretStore(dataDir),
 });
 
 const server = app.listen(port, host, () => {

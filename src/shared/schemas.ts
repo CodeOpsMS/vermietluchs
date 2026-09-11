@@ -251,7 +251,7 @@ export const settlementCloseSchema = z
   });
 
 export const backupSchema = z.object({
-  schemaVersion: z.literal(BACKUP_SCHEMA_VERSION),
+  schemaVersion: z.union([z.literal(1), z.literal(BACKUP_SCHEMA_VERSION)]),
   exportedAt: z.string().datetime(),
   app: z.literal('Vermietluchs'),
   tables: z.record(z.array(z.record(z.unknown()))),

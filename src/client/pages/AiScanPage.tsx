@@ -6,11 +6,13 @@ import {
   EmptyState,
   ErrorBox,
   Loading,
+  Modal,
   Notice,
   PageHeader,
   StatusPill,
 } from '../components/Common';
 import { euro } from '../format';
+import { PapraDocumentPicker, type SelectedPapraDocument } from '../components/PapraDocuments';
 import type {
   AiImportRequest,
   AiScanCost,
@@ -59,6 +61,8 @@ export default function AiScanPage({
 }: PageProps & { aiSettings: AiSettings }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [papraDocument, setPapraDocument] = useState<SelectedPapraDocument | null>(null);
+  const [papraPicker, setPapraPicker] = useState(false);
   const [response, setResponse] = useState<AiScanResponse | null>(null);
   const [costs, setCosts] = useState<CostDraft[]>([]);
   const [readings, setReadings] = useState<ReadingDraft[]>([]);
@@ -90,6 +94,7 @@ export default function AiScanPage({
     setResponse(null);
     setCosts([]);
     setReadings([]);
+    setPapraDocument(null);
     if (!next) return setFile(null);
     if (!next.name.toLocaleLowerCase('de-DE').endsWith('.pdf')) {
       setFile(null);
@@ -116,7 +121,7 @@ export default function AiScanPage({
   }
 
   async function scan() {
-    if (!file || !propertyId) return;
+    if ((!file && !papraDocument) || !propertyId) return;
     setBusy(true);
     setError('');
     setMessage('');
@@ -124,13 +129,19 @@ export default function AiScanPage({
     setCosts([]);
     setReadings([]);
     try {
-      const result = await postJson<AiScanResponse>('/api/ai/scan', {
-        propertyId,
-        year,
-        fileName: file.name,
-        mimeType: 'application/pdf',
-        dataBase64: await fileToBase64(file),
-      });
+      const result = papraDocument
+        ? await postJson<AiScanResponse>('/api/ai/scan/papra', {
+            propertyId,
+            year,
+            selection: papraDocument.selection,
+          })
+        : await postJson<AiScanResponse>('/api/ai/scan', {
+            propertyId,
+            year,
+            fileName: file!.name,
+            mimeType: 'application/pdf',
+            dataBase64: await fileToBase64(file!),
+          });
       setResponse(result);
       setCosts(
         result.costs.map((cost) => ({
@@ -183,6 +194,7 @@ export default function AiScanPage({
       propertyId,
       year,
       fileName: response?.fileName ?? file?.name ?? 'KI-Scan.pdf',
+      papraSource: response?.papraSource,
       costs: selectedCosts.map((cost) => ({
         description: cost.description,
         amount: cost.amount,
@@ -215,6 +227,7 @@ export default function AiScanPage({
       setCosts([]);
       setReadings([]);
       setFile(null);
+      setPapraDocument(null);
       if (fileRef.current) fileRef.current.value = '';
     } catch (reason) {
       setError(
@@ -265,7 +278,11 @@ export default function AiScanPage({
           <span className="empty-mark" aria-hidden="true">
             ⇧
           </span>
-          <strong>{file?.name ?? 'PDF hier ablegen'}</strong>
+          <strong>
+            {papraDocument
+              ? `Papra · ${papraDocument.document.name}`
+              : (file?.name ?? 'PDF hier ablegen')}
+          </strong>
           <small>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : 'maximal 20 MB'}</small>
           <input
             ref={fileRef}
@@ -283,6 +300,13 @@ export default function AiScanPage({
           >
             PDF auswählen
           </button>
+          <button
+            className="btn btn-secondary"
+            disabled={busy || !propertyId}
+            onClick={() => setPapraPicker(true)}
+          >
+            Aus Papra auswählen
+          </button>
         </div>
         <div className="form-actions">
           <small>
@@ -291,13 +315,34 @@ export default function AiScanPage({
           <button
             className="btn btn-primary"
             type="button"
-            disabled={!file || !propertyId || busy}
+            disabled={(!file && !papraDocument) || !propertyId || busy}
             onClick={() => void scan()}
           >
             {busy ? 'KI analysiert …' : 'PDF analysieren'}
           </button>
         </div>
       </section>
+
+      {papraPicker && propertyId && (
+        <Modal title="PDF aus Papra auswählen" onClose={() => setPapraPicker(false)} wide>
+          <PapraDocumentPicker
+            propertyId={propertyId}
+            pdfOnly
+            onCancel={() => setPapraPicker(false)}
+            onSelect={(selected) => {
+              setFile(null);
+              setPapraDocument(selected);
+              setPapraPicker(false);
+              setResponse(null);
+              setCosts([]);
+              setReadings([]);
+              setError('');
+              setMessage('');
+              if (fileRef.current) fileRef.current.value = '';
+            }}
+          />
+        </Modal>
+      )}
 
       {busy && <Loading label="PDF wird gelesen und von der KI ausgewertet …" />}
 
@@ -316,6 +361,12 @@ export default function AiScanPage({
             KI-Ergebnisse können falsch sein. Prüfe Bezeichnung, Betrag, Umlageschlüssel,
             Zählerzuordnung und Datum. Es werden weder Mieter noch Abrechnungen angelegt.
           </p>
+          {response.papraSource && (
+            <Notice>
+              Beim Übernehmen wird das Papra-Original automatisch mit allen neu angelegten
+              Kostenpositionen verknüpft.
+            </Notice>
+          )}
           {response.warnings.length > 0 && (
             <Notice kind="warning">
               <ul>

@@ -29,6 +29,10 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
     ...(error instanceof Error && 'code' in error ? { code: error.code } : {}),
     ...(error instanceof ZodError ? { fields: error.issues.map((issue) => issue.path) } : {}),
   };
+  if (response.headersSent) {
+    response.destroy();
+    return;
+  }
   if (error instanceof Error && 'type' in error && error.type === 'entity.parse.failed') {
     response.status(400).json({ error: 'Der JSON-Inhalt ist ungültig.' });
     return;
