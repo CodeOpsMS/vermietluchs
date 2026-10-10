@@ -17,6 +17,7 @@ type CostListProps = {
   onViewChange: (view: CostView) => void;
   onCreate: () => void;
   onEdit: (cost: Cost) => void;
+  onDocuments: (cost: Cost) => void;
   onDelete: (cost: Cost) => void | Promise<void>;
 };
 
@@ -28,6 +29,7 @@ export function CostList({
   onViewChange,
   onCreate,
   onEdit,
+  onDocuments,
   onDelete,
 }: CostListProps) {
   const pendingCount = costs.filter((cost) => cost.tenantStatus === 'pending').length;
@@ -166,6 +168,13 @@ export function CostList({
                       {cost.labor35a > 0 && <small>davon §35a {euro(cost.labor35a)}</small>}
                     </td>
                     <td className="actions-cell no-print">
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => onDocuments(cost)}
+                        aria-label={`Belege für ${cost.descriptionInternal}`}
+                      >
+                        Belege
+                      </button>
                       <button
                         className="icon-button"
                         type="button"

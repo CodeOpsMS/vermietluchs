@@ -3,9 +3,9 @@
 set -euo pipefail
 
 image="${1:?Docker-Image als erstes Argument angeben}"
-mode="${2:?Testmodus empty oder example als zweites Argument angeben}"
+mode="${2:?Testmodus empty, example oder upgrade als zweites Argument angeben}"
 
-if [[ "$mode" != "empty" && "$mode" != "example" ]]; then
+if [[ "$mode" != "empty" && "$mode" != "example" && "$mode" != "upgrade" ]]; then
   echo "Unbekannter Testmodus: $mode" >&2
   exit 2
 fi
@@ -19,12 +19,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-container_id="$(
+if [[ "$mode" == "upgrade" ]]; then
+  container_id="$(docker create --publish 127.0.0.1:3001:3001 "$image" \
+    sh -c 'node /app/container-upgrade-seed.ts && exec node dist/server/index.js')"
+  docker cp tests/container-upgrade-seed.ts "$container_id:/app/container-upgrade-seed.ts"
+  docker start "$container_id" >/dev/null
+else
+  container_id="$(
   docker run \
     --detach \
     --publish 127.0.0.1:3001:3001 \
     "$image"
 )"
+fi
 
 for attempt in {1..20}; do
   if curl --fail --silent http://127.0.0.1:3001/api/health >/dev/null; then

@@ -1,5 +1,5 @@
 export const APP_NAME = 'Vermietluchs';
-export const BACKUP_SCHEMA_VERSION = 1;
+export const BACKUP_SCHEMA_VERSION = 2;
 
 export const STATEMENT_GROUPS = ['Wohnung', 'Garage', 'Grundsteuer'] as const;
 export const TENANT_STATUSES = ['included', 'excluded', 'pending'] as const;

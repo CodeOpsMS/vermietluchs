@@ -81,6 +81,30 @@ describe('Datenbankmigrationen', () => {
     });
   });
 
+  test('ergänzt Papra in Schema 4 ohne bestehende Werte zu ändern und bleibt idempotent', () => {
+    const oldMigrations = path.join(directory, 'schema4');
+    fs.mkdirSync(oldMigrations);
+    for (const name of fs
+      .readdirSync(path.resolve('migrations'))
+      .filter((file) => /^00[1-4]_/.test(file))) {
+      fs.copyFileSync(path.resolve('migrations', name), path.join(oldMigrations, name));
+    }
+    db.close();
+    const filename = path.join(directory, 'old.sqlite');
+    db = openDatabase(filename, { migrationsDir: oldMigrations });
+    db.prepare("INSERT INTO properties (name, address) VALUES ('Bestand', 'Weg 1')").run();
+    const before = db.prepare('SELECT * FROM properties').all();
+    runMigrations(db, path.resolve('migrations'));
+    runMigrations(db, path.resolve('migrations'));
+    expect(db.prepare('SELECT * FROM properties').all()).toEqual(before);
+    expect(db.prepare('SELECT base_url, enabled FROM papra_settings').get()).toEqual({
+      base_url: '',
+      enabled: 0,
+    });
+    expect(db.prepare('SELECT * FROM document_links').all()).toEqual([]);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
+
   test('ergänzt KI-Einstellungen in einer bestehenden Datenbank ohne Fachdaten zu verändern', () => {
     db.close();
     const oldMigrations = path.join(directory, 'old-migrations');
@@ -104,7 +128,7 @@ describe('Datenbankmigrationen', () => {
       provider: 'ollama',
     });
     expect(db.prepare('SELECT max(version) AS version FROM schema_migrations').get()).toEqual({
-      version: 4,
+      version: 5,
     });
   });
 
@@ -136,6 +160,7 @@ describe('Datenbankmigrationen', () => {
         { name: '002_operating_cost_plans.sql' },
         { name: '003_ai_scan.sql' },
         { name: '004_ai_compatible.sql' },
+        { name: '005_papra.sql' },
       ]);
       expect(db.prepare('SELECT count(*) AS total FROM operating_cost_plans').get()).toEqual({
         total: 0,

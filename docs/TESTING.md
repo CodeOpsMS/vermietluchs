@@ -1,10 +1,17 @@
 # Teststrategie
 
-Stand: 7. September 2026. Der KI-Scan-Main umfasst 261 Vitest-Tests und vier
-Chromium-Szenarien. Die Tests prüfen unter anderem KI-Provider,
-Sicherheitsgrenzen, transaktionalen Import, optionale Navigation und
-Wirtschaftsplan. Zusätzlich sind zwei Tests des gebauten Container-Images
-vorgesehen.
+Die Papra-Erweiterung ergänzt Tests für den REST-Vertrag von Papra 26.6.1,
+Schlüssel, organisationsgebundene Hausauswahl, Dateiübertragung, atomare
+Belegzuordnung, Migration und Backups. Vier zusätzliche Browser-Szenarien
+verwenden einen lokalen Papra-/KI-Testdienst; die PDF-Anzeige wird im vollständigen
+Chromium getestet. Der separat wiederholbare Praxistest ist unter
+[Papra-Anbindung](PAPRA.md#tests) beschrieben.
+
+Stand: 11. September 2026. Der Branch mit ausführlicher Protokollierung und
+Papra-Anbindung umfasst 324 Vitest-Tests und 20 Chromium-Szenarien. Zusätzlich
+prüft die CI das gebaute Container-Image mit leerer Datenbank, Beispieldaten und
+einem vorhandenen Schema-4-Bestand. Ein echter Papra-Zugriff aus dem
+Vermietluchs-Container wurde mit simuliertem KI-Anbieter erfolgreich geprüft.
 
 Der [Review vom 7. September 2026](CODE_REVIEW_2026-09-07.md) dokumentiert
 zusätzliche Regressionen auf getrennten Verbesserungsbranches und die erneute
@@ -23,13 +30,14 @@ Die Testanzahl hängt bis zum Merge vom Branch ab.
 | Container-Image             | leere Datenbank und reproduzierbare Beispieldaten für 2023             | siehe unten             |
 | vollständige Commit-Prüfung | Format, Typen, Lint, Coverage-Tests und Build                          | `npm run check`         |
 
-Nach dem Bauen des Images prüft die CI zwei vollständig getrennte, neue
+Nach dem Bauen des Images prüft die CI drei vollständig getrennte, neue
 Container ohne Daten-Volume:
 
 ```bash
 docker build --tag vermietluchs:test .
 bash scripts/test-container-image.sh vermietluchs:test empty
 bash scripts/test-container-image.sh vermietluchs:test example
+bash scripts/test-container-image.sh vermietluchs:test upgrade
 ```
 
 Der Leertest kontrolliert über den JSON-Backup-Export, dass sämtliche
@@ -39,6 +47,9 @@ Zahlung, Zähler und Ablesungen für 2023 an und prüft anschließend Export und
 Dashboard. Dadurch kann kein bereits vorhandenes Host-Volume den Test
 beeinflussen. Weil `/data` nicht durch einen Mount verdeckt wird, erkennt der
 Leertest außerdem versehentlich in das Image übernommene Datenbanken.
+Der Upgrade-Test legt vor dem Serverstart eine Schema-4-Datenbank mit einem Haus,
+Kosten und KI-Einstellungen an. Der Server muss auf Schema 5 migrieren und dabei
+IDs, Beträge, Revisionen und Einstellungen erhalten.
 
 Der HTML-Bericht wird unter `coverage/index.html` erzeugt. Die CI lädt den
 vollständigen Ordner auch bei einem fehlgeschlagenen Testlauf für 14 Tage als

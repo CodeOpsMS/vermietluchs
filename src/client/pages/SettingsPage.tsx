@@ -3,6 +3,7 @@ import { downloadBackup, getJson, importBackup, postJson, putJson } from '../api
 import { AI_PROVIDER_DEFAULTS } from '../../shared/ai';
 import { ErrorBox, Loading, Notice, PageHeader } from '../components/Common';
 import type { AiProvider, AiSettings, Settings } from '../types';
+import PapraSettingsCard from '../components/PapraSettingsCard';
 
 export default function SettingsPage({ reload }: { reload: () => Promise<void> }) {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -12,6 +13,7 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [papraReload, setPapraReload] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -122,6 +124,7 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
     setMessage('');
     try {
       await importBackup(file);
+      setPapraReload((current) => current + 1);
       await reload();
       await load();
       setMessage('Backup erfolgreich eingespielt.');
@@ -221,6 +224,7 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
           </section>
 
           <div className="settings-side">
+            <PapraSettingsCard key={papraReload} />
             <section className="card ai-settings-card">
               <div className="section-heading">
                 <div>
@@ -417,7 +421,9 @@ export default function SettingsPage({ reload }: { reload: () => Promise<void> }
               </div>
               <p>
                 Ein Export enthält Häuser, Wohnungen, Mietverhältnisse, Kosten, Zähler, Zahlungen,
-                Einstellungen und abgeschlossene Abrechnungen.
+                Einstellungen, abgeschlossene Abrechnungen und Papra-Verknüpfungen.
+                Papra-Originaldateien benötigen ein eigenes Backup; API-Schlüssel werden nicht
+                exportiert.
               </p>
               <button
                 className="btn btn-primary full-width"

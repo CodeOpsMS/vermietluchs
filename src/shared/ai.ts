@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ALLOCATION_KEYS, METER_TYPES } from './constants';
 import { dateSchema, idSchema, moneySchema, revisionSchema, yearSchema } from './schemas';
+import { papraSourceSchema, type PapraSource } from './papra';
 
 export const AI_PROVIDERS = ['openai', 'mistral', 'ollama', 'compatible'] as const;
 export const aiProviderSchema = z.enum(AI_PROVIDERS);
@@ -160,6 +161,7 @@ export const aiImportRequestSchema = z
     propertyId: idSchema,
     year: yearSchema,
     fileName: z.string().trim().min(1).max(255),
+    papraSource: papraSourceSchema.optional(),
     costs: z.array(aiImportCostSchema).max(500),
     readings: z.array(aiImportReadingSchema).max(500),
   })
@@ -185,6 +187,7 @@ export type AiSettings = Omit<AiSettingsUpdate, 'apiKey' | 'clearApiKey'> & {
 };
 
 export type AiScanResponse = AiScanResult & {
+  papraSource?: PapraSource;
   provider: AiProvider;
   model: string;
   fileName: string;

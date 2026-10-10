@@ -73,6 +73,9 @@ jobs:
       - name: Docker-Image mit Beispieldaten prüfen
         run: bash scripts/test-container-image.sh vermietluchs:test example
 
+      - name: Docker-Start mit bestehender Schema-4-Datenbank prüfen
+        run: bash scripts/test-container-image.sh vermietluchs:test upgrade
+
   release:
     name: Release und Container veröffentlichen
     needs: check

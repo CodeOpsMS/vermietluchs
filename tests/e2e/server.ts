@@ -3,9 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../src/server/app';
 import { openDatabase } from '../../src/server/database';
+import { startPapraTestServer } from '../helpers/papra-server';
 
 const host = '127.0.0.1';
 const port = 3101;
+const papra = await startPapraTestServer(3102);
 const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'vermietluchs-e2e-'));
 const db = openDatabase(path.join(dataDirectory, 'vermietluchs.sqlite'), {
   migrationsDir: path.resolve('migrations'),
@@ -16,6 +18,7 @@ const server = app.listen(port, host, () => {
 });
 
 function cleanup(): void {
+  void papra.close();
   db.close();
   fs.rmSync(dataDirectory, { recursive: true, force: true });
 }

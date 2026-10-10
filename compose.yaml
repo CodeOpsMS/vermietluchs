@@ -13,6 +13,13 @@ services:
       VERMIETLUCHS_HOST: 0.0.0.0
       VERMIETLUCHS_DATA_DIR: /data
       VERMIETLUCHS_ALLOWED_HOSTS: ${VERMIETLUCHS_ALLOWED_HOSTS:-}
+      VERMIETLUCHS_LOG_LEVEL: ${VERMIETLUCHS_LOG_LEVEL:-info}
+      VERMIETLUCHS_LOG_VALUES: ${VERMIETLUCHS_LOG_VALUES:-true}
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '5'
     volumes:
       - vermietluchs-data:/data
 

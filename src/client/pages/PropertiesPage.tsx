@@ -21,6 +21,7 @@ import PropertyStrip from './properties/PropertyStrip';
 import TenancyFormModal from './properties/TenancyFormModal';
 import UnitFormModal from './properties/UnitFormModal';
 import UnitsSection from './properties/UnitsSection';
+import DocumentLinksModal from '../components/DocumentLinksModal';
 
 export default function PropertiesPage({ data, allData, propertyId, year, reload }: PageProps) {
   const [propertyForm, setPropertyForm] = useState<PropertyForm | null>(null);
@@ -30,6 +31,7 @@ export default function PropertiesPage({ data, allData, propertyId, year, reload
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [documentProperty, setDocumentProperty] = useState<Property | null>(null);
 
   const property = allData.properties.find((item) => item.id === propertyId) ?? null;
   const units = data.units;
@@ -234,6 +236,7 @@ export default function PropertiesPage({ data, allData, propertyId, year, reload
         selectedPropertyId={propertyId}
         onEdit={(selectedProperty) => setPropertyForm(propertyToForm(selectedProperty))}
         onDelete={deleteProperty}
+        onDocuments={setDocumentProperty}
       />
 
       {!property && (
@@ -269,6 +272,14 @@ export default function PropertiesPage({ data, allData, propertyId, year, reload
         />
       )}
 
+      {documentProperty && (
+        <DocumentLinksModal
+          key={documentProperty.id}
+          propertyId={documentProperty.id}
+          title={`Dokumente · ${documentProperty.name}`}
+          onClose={() => setDocumentProperty(null)}
+        />
+      )}
       {propertyForm && (
         <PropertyFormModal
           form={propertyForm}

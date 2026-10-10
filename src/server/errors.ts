@@ -23,6 +23,16 @@ export const notFoundHandler: RequestHandler = (_request, response) => {
 
 export const errorHandler: ErrorRequestHandler = (error: unknown, request, response, next) => {
   void next; // Vier Parameter sind nötig, damit Express die Funktion als Error-Middleware erkennt.
+  // Rohe Fehler können Schlüssel, Dokumenttexte oder ungültige JSON-Eingaben enthalten.
+  response.locals.logError = {
+    name: error instanceof Error ? error.name : 'UnknownError',
+    ...(error instanceof Error && 'code' in error ? { code: error.code } : {}),
+    ...(error instanceof ZodError ? { fields: error.issues.map((issue) => issue.path) } : {}),
+  };
+  if (response.headersSent) {
+    response.destroy();
+    return;
+  }
   if (error instanceof Error && 'type' in error && error.type === 'entity.parse.failed') {
     response.status(400).json({ error: 'Der JSON-Inhalt ist ungültig.' });
     return;
@@ -79,6 +89,5 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
       .json({ error: 'Die Änderung verletzt eine Datenregel oder eine bestehende Verknüpfung.' });
     return;
   }
-  console.error(error);
   response.status(500).json({ error: 'Interner Serverfehler.' });
 };

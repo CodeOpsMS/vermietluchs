@@ -26,6 +26,8 @@ Jahren Programmiererfahrung gut nachvollziehbar bleibt.
 - alle Daten als JSON sichern und transaktional wiederherstellen
 - optional PDFs mit OpenAI, Mistral/Mixtral oder einer lokalen Ollama-Instanz
   analysieren und Kosten/Zählerstände nach manueller Prüfung übernehmen
+- Papra-Dokumente mit Häusern und Kosten verknüpfen und PDFs direkt aus Papra
+  in den KI-Scan übernehmen; die Originaldateien bleiben in Papra
 
 ## Schnellstart mit Docker
 
@@ -71,6 +73,78 @@ Danach wird das aktuelle Image so geladen und der Container neu erstellt:
 docker compose pull
 docker compose up -d
 ```
+
+## Protokollierung im Docker-Betrieb
+
+Vermietluchs schreibt strukturierte JSON-Zeilen nach stdout/stderr. Damit sind
+alle API-Aufrufe in den Container-Logs sichtbar: abgesendete Eingaben,
+Einstellungsänderungen, Anlegen/Ändern/Löschen von Datensätzen, Mieterwechsel,
+Jahresbuchungen, Abrechnungen, Backup-Import/Export und KI-Aktionen. Schreibaufrufe
+erhalten sofort einen Starteintrag und anschließend einen Ergebniseintrag mit
+Zeitpunkt (UTC), Request-ID, Methode, Pfad, Client-IP, HTTP-Status und Laufzeit.
+Die Request-ID steht auch im Antwortheader `X-Request-Id`. Fehler, Konflikte und
+abgebrochene Verbindungen sind als solche gekennzeichnet. Die IP bezeichnet die
+direkte Verbindung; hinter einem Proxy ist dies dessen Adresse. Da es keine
+Benutzeranmeldung gibt, kann das Log keine Person als Bearbeiter nachweisen.
+
+Nach Installation einer Version mit dieser Funktion:
+
+```bash
+# Die noch aufbewahrten Logs anzeigen
+docker logs --timestamps vermietluchs
+
+# Die letzten 200 Zeilen anzeigen und neue Aktionen live verfolgen
+docker logs --follow --tail 200 --timestamps vermietluchs
+```
+
+Die Optionen sind in `.env.example` und `compose.yaml` vorbereitet:
+
+| Variable                  | Standard | Verhalten                                                                                                                                            |
+| ------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VERMIETLUCHS_LOG_LEVEL`  | `info`   | Alle API-Aktionen; `debug` zeigt zusätzlich erfolgreiche Healthchecks und statische Aufrufe. `warn`, `error` und `silent` schränken die Ausgabe ein. |
+| `VERMIETLUCHS_LOG_VALUES` | `true`   | Abgesendete JSON-Felder, Filter, Revisionen und Ergebnisse von Schreibaufrufen anzeigen; `false` unterdrückt diese Werte.                            |
+
+Änderungen an den Variablen werden nach `docker compose up -d` durch Neuerstellen
+des Containers wirksam. Auf einen fest eingestellten alten Image-Tag wie `0.0.9`
+hat diese Konfiguration allein keine Wirkung; dafür ist ein neues Image nötig.
+
+Bei aktivierten Werten enthalten die Logs auch eingegebene Namen, Adressen,
+Bankverbindungen und Beträge. API-Schlüssel, Passwörter, Tokens und Cookies
+werden ausgeblendet. PDF-/Base64-Inhalte werden ausgelassen, Backup-Inhalte
+durch Tabellenanzahlen ersetzt und normale Leseantworten nicht nochmals
+ausgegeben. Sehr große Werte werden ausdrücklich als `TRUNCATED` gekennzeichnet
+(4.000 Zeichen je Text, 100 Einträge je Liste/Objekt, acht Verschachtelungsebenen).
+Eingaben werden beim Absenden an den Server erfasst. Noch ungespeicherte
+Tastatureingaben, lokale Designwechsel und der Druckdialog im Browser erzeugen
+keinen API-Aufruf und damit keinen Server-Logeintrag.
+
+Die mitgelieferte Compose-Datei rotiert die Logs mit fünf Dateien zu je 20 MB.
+Ältere Einträge werden dadurch entfernt; beim Entfernen/Ersetzen des Containers
+bleiben dessen Logs ebenfalls nicht als dauerhaftes Archiv erhalten. Benötigte
+Logs deshalb vor einem Update sichern oder extern sammeln. Die Logs sind ein
+Betriebsprotokoll und kein unveränderliches Änderungsarchiv. Frühere Aktionen,
+die Version `0.0.9` nicht protokolliert hat, lassen sich damit nicht nachträglich
+anzeigen.
+
+## Dokumente aus Papra
+
+Unter **Einstellungen → Papra** die aus dem Vermietluchs-Container erreichbare
+Papra-Adresse und einen API-Schlüssel mit `organizations:read` und
+`documents:read` hinterlegen und **Verbindung prüfen** auswählen. Anschließend
+unter **Stammdaten → Dokumente** für jedes Haus seine Papra-Organisation festlegen.
+
+Unter **Kosten → Belege** und bei den Häusern lassen sich mehrere Dokumente
+verknüpfen. PDFs öffnen direkt über Vermietluchs oder werden heruntergeladen.
+**KI-Scan → Aus Papra auswählen** lädt ein PDF ohne manuellen Download in die
+Analyse. Erst nach Prüfung und Bestätigung werden Kosten angelegt und mit dem
+Papra-Original verknüpft. Es werden keine Dokumente in Papra verändert oder gelöscht.
+
+Der Schlüssel liegt separat in `/data/papra-secrets.json` mit Dateirechten 0600.
+JSON-Backups enthalten die Zuordnungen, jedoch weder Schlüssel noch Originaldateien.
+Nach einem Restore muss die Papra-Verbindung erneut eingerichtet werden.
+Ein eigenes Papra-Backup bleibt erforderlich.
+
+Einrichtung, API-Verhalten und Integrationstest: [Papra-Anbindung](docs/PAPRA.md).
 
 ## Releases und Container-Paket
 
